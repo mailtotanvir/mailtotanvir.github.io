@@ -663,11 +663,6 @@
 
                 section.hidden = shown === 0;
 
-                // live pin counter on every button
-                cards.forEach(function (card) {
-                    var btn = card.querySelector('.pin-btn-count');
-                    if (btn) btn.textContent = String(pins.length);
-                });
             }
 
             function setButton(card, isPinned) {
@@ -676,7 +671,7 @@
                     btn = document.createElement('button');
                     btn.className = 'pin-toggle';
                     btn.setAttribute('aria-label', 'Pin or unpin this post');
-                    btn.innerHTML = '<span class="pin-btn-icon">\uD83D\uDCCC</span><span class="pin-btn-count"></span>';
+                    btn.textContent = '\uD83D\uDCCC';
                     btn.addEventListener('click', function (e) {
                         e.preventDefault();   // don't navigate: card is a link
                         e.stopPropagation();
