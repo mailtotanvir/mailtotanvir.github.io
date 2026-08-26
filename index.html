@@ -252,6 +252,73 @@
             color: var(--accent-primary);
         }
 
+        /* Pinned Posts Section */
+        .pinned-section {
+            margin-bottom: 72px;
+        }
+
+        .pinned-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+
+        @media (min-width: 640px) {
+            .pinned-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .pinned-card {
+            background: var(--glass-card);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(79, 70, 229, 0.18);
+            border-radius: 20px;
+            padding: 28px;
+            position: relative;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            text-decoration: none;
+            display: block;
+            box-shadow: 0 10px 30px rgba(79, 70, 229, 0.05),
+                        0 1px 3px rgba(0, 0, 0, 0.01);
+        }
+
+        .pinned-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 24px;
+            right: 24px;
+            height: 3px;
+            background: var(--accent-gradient);
+            border-radius: 0 0 4px 4px;
+        }
+
+        .pinned-card:hover {
+            transform: translateY(-4px) scale(1.01);
+            border-color: var(--border-hover);
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 20px 40px rgba(79, 70, 229, 0.09),
+                        0 1px 4px rgba(0, 0, 0, 0.01);
+        }
+
+        .pinned-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: linear-gradient(135deg, rgba(79, 70, 229, 0.12), rgba(6, 182, 212, 0.12));
+            color: var(--accent-primary);
+            padding: 3px 12px;
+            border-radius: 99px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            border: 1px solid rgba(79, 70, 229, 0.2);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 12px;
+        }
+
         footer {
             margin-top: 112px;
             text-align: center;
@@ -286,9 +353,32 @@
 
         <!-- Chronological Timeline -->
         <main>
+            <!-- Pinned Posts (populated by script from .pinned cards below) -->
+            <section class="pinned-section" id="pinned-section" hidden>
+                <h2 class="section-title">&#128204; Pinned</h2>
+                <div class="pinned-grid" id="pinned-grid"></div>
+            </section>
+
             <h2 class="section-title">Timeline & Publications</h2>
             
             <div class="timeline">
+                <!-- Project: AI Engineering Visual Encyclopedia -->
+                <a href="/AI-Engineering-Visual-Guide/" class="article-card">
+                    <div class="article-meta">
+                        <span class="article-date">Ongoing &mdash; updated regularly</span>
+                        <span class="article-category">Visual Encyclopedia</span>
+                    </div>
+                    <h3 class="article-title">&#128444;&#65039; See the Machine Think: An AI Engineering Visual Encyclopedia, Built Gradually in Public</h3>
+                    <p class="article-desc">A living, visual encyclopedia of AI engineering: CUDA kernels, inference pipelines, and the systems behind modern machine intelligence, explained through diagrams rather than prose. I will keep building and adding entries over the coming months, so check back as the atlas grows.</p>
+                    <div class="tech-tags">
+                        <span class="tech-tag">Visual Explanations</span>
+                        <span class="tech-tag">CUDA</span>
+                        <span class="tech-tag">Inference Systems</span>
+                        <span class="tech-tag">AI Engineering</span>
+                        <span class="tech-tag">Living Document</span>
+                    </div>
+                </a>
+
                 <!-- Project: FORGE -->
                 <a href="/forge/blog.html" class="article-card">
                     <div class="article-meta">
@@ -326,7 +416,7 @@
                 </a>
 
                 <!-- Project: Learn and Practice the Building Blocks of DeepSeek-V4 -->
-                <a href="https://mailtotanvir.github.io/mastering-deepseek-v4-architecture/blog/deepseek-v4-building-blocks/" class="article-card">
+                <a href="https://mailtotanvir.github.io/mastering-deepseek-v4-architecture/blog/deepseek-v4-building-blocks/" class="article-card pinned" data-pin-order="2">
                     <div class="article-meta">
                         <span class="article-date">August 21, 2026</span>
                         <span class="article-category">Frontier AI Architecture</span>
@@ -361,7 +451,7 @@
                 </a>
 
                 <!-- Project: Learn and Practice the Building Blocks of Kimi K3 -->
-                <a href="/build-Kimi-K3-architecture/blog/kimi-k3-building-blocks/" class="article-card">
+                <a href="/build-Kimi-K3-architecture/blog/kimi-k3-building-blocks/" class="article-card pinned" data-pin-order="1">
                     <div class="article-meta">
                         <span class="article-date">August 12, 2026</span>
                         <span class="article-category">Frontier AI Architecture</span>
@@ -395,7 +485,7 @@
                 </a>
 
                 <!-- Project: Enterprise Agentic AI Portfolio -->
-                <a href="https://tanvir-s-enterprise-agentic-portfolio.github.io/.github/" class="article-card">
+                <a href="https://tanvir-s-enterprise-agentic-portfolio.github.io/.github/" class="article-card pinned" data-pin-order="3">
                     <div class="article-meta">
                         <span class="article-date">August 9, 2026</span>
                         <span class="article-category">Enterprise Architecture</span>
@@ -466,6 +556,33 @@
             <p>© 2026 Tanvir • Tracking my projects & publications. Hosted on <a href="https://github.com/mailtotanvir" target="_blank">GitHub</a>.</p>
         </footer>
     </div>
+
+    <script>
+        // Move cards marked .pinned into the Pinned grid, ordered by data-pin-order.
+        // Cards stay in the DOM once (single source of truth); no-JS visitors simply
+        // see everything chronologically in the timeline.
+        (function () {
+            var pinned = Array.from(document.querySelectorAll('.timeline a.article-card.pinned'));
+            if (!pinned.length) return;
+            pinned.sort(function (a, b) {
+                return (parseInt(a.dataset.pinOrder, 10) || 99) - (parseInt(b.dataset.pinOrder, 10) || 99);
+            });
+            var grid = document.getElementById('pinned-grid');
+            pinned.forEach(function (card) {
+                card.classList.remove('article-card');
+                card.classList.add('pinned-card');
+                var meta = card.querySelector('.article-meta');
+                if (meta && !card.querySelector('.pinned-badge')) {
+                    var badge = document.createElement('span');
+                    badge.className = 'pinned-badge';
+                    badge.textContent = '\uD83D\uDCCC Pinned';
+                    meta.insertBefore(badge, meta.firstChild);
+                }
+                grid.appendChild(card);
+            });
+            document.getElementById('pinned-section').hidden = false;
+        })();
+    </script>
 
 </body>
 </html>
