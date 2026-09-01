@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Debugger That Had to Prove Itself - Tanvir</title>
+  <meta name="description" content="Building an autonomous debugger with GPT-5.6 Sol and Solari sandboxes - then rejecting its first green build because it weakened a test.">
+  <meta property="og:title" content="The Debugger That Had to Prove Itself">
+  <meta property="og:description" content="A blind debugging experiment with four injected faults, disposable VMs, 53 passing tests, and replayable evidence.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://mailtotanvir.github.io/solari-autonomous-debugger/">
+  <meta name="twitter:card" content="summary">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #e9eef9;
+      --muted: #9aa8bf;
+      --bg: #080b12;
+      --panel: #101722;
+      --line: #263246;
+      --mint: #5ee7b7;
+      --amber: #ffca6a;
+      --blue: #77a8ff;
+      --red: #ff7c89;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 15% 0%, rgba(64, 104, 178, .23), transparent 34rem),
+        radial-gradient(circle at 90% 20%, rgba(54, 181, 146, .12), transparent 30rem),
+        var(--bg);
+      font: 17px/1.75 Manrope, system-ui, sans-serif;
+    }
+    a { color: var(--mint); }
+    .shell { width: min(1120px, calc(100% - 40px)); margin: auto; }
+    nav { display: flex; justify-content: space-between; padding: 24px 0; font: 600 14px IBM Plex Mono, monospace; }
+    nav a { color: var(--muted); text-decoration: none; }
+    header { padding: 90px 0 72px; max-width: 920px; }
+    .eyebrow { color: var(--mint); font: 600 13px IBM Plex Mono, monospace; letter-spacing: .14em; text-transform: uppercase; }
+    h1 { margin: 18px 0 24px; font-size: clamp(3rem, 8vw, 6.7rem); line-height: .98; letter-spacing: -.065em; }
+    .lede { max-width: 760px; color: #c5cede; font-size: clamp(1.15rem, 2.4vw, 1.5rem); }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 40px 0 0; }
+    .stat, .panel { border: 1px solid var(--line); background: rgba(16, 23, 34, .84); border-radius: 16px; }
+    .stat { padding: 20px; }
+    .stat strong { display: block; color: var(--mint); font: 700 2rem IBM Plex Mono, monospace; }
+    .stat span { color: var(--muted); font-size: .83rem; }
+    article { max-width: 820px; margin: 0 auto; padding-bottom: 100px; }
+    section { margin: 72px 0; }
+    h2 { margin: 0 0 20px; font-size: 2rem; letter-spacing: -.035em; }
+    h3 { margin-top: 32px; }
+    p, li { color: #bcc6d7; }
+    .panel { padding: 28px; }
+    .flow { overflow-x: auto; color: var(--blue); font: 500 14px/1.8 IBM Plex Mono, monospace; white-space: pre; }
+    code { color: var(--amber); font-family: IBM Plex Mono, monospace; }
+    .callout { border-left: 4px solid var(--amber); padding: 4px 0 4px 24px; }
+    .good { border-left-color: var(--mint); }
+    table { width: 100%; border-collapse: collapse; font-size: .93rem; }
+    th, td { border-bottom: 1px solid var(--line); padding: 14px 10px; text-align: left; vertical-align: top; }
+    th { color: var(--muted); font: 600 12px IBM Plex Mono, monospace; text-transform: uppercase; }
+    .button { display: inline-block; margin: 8px 8px 0 0; padding: 11px 16px; border: 1px solid var(--mint); border-radius: 10px; color: #07110d; background: var(--mint); font-weight: 800; text-decoration: none; }
+    .button.secondary { color: var(--mint); background: transparent; }
+    footer { border-top: 1px solid var(--line); padding: 32px 0 60px; color: var(--muted); font-size: .9rem; }
+    @media (max-width: 720px) { .stats { grid-template-columns: 1fr 1fr; } header { padding-top: 55px; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav><a href="/">← Tanvir’s build log</a><a href="https://github.com/mailtotanvir/solari-cookbook/tree/feat/autonomous-debugger/recipes/autonomous-debugger">GitHub ↗</a></nav>
+    <header>
+      <div class="eyebrow">Autonomous debugging · September 2026</div>
+      <h1>The debugger that had to prove itself.</h1>
+      <p class="lede">I built an autonomous SRE loop that receives one thing - a broken Git URL - and returns a tested patch, an incident report, and a replay. The interesting part was not when it found the bugs. It was when I refused its first green build.</p>
+      <div class="stats">
+        <div class="stat"><strong>25</strong><span>failures reproduced</span></div>
+        <div class="stat"><strong>4/4</strong><span>injected faults reversed</span></div>
+        <div class="stat"><strong>53</strong><span>tests passing</span></div>
+        <div class="stat"><strong>3</strong><span>Solari primitives</span></div>
+      </div>
+    </header>
+
+    <article>
+      <section>
+        <h2>The problem</h2>
+        <p>This project started with a problem familiar to platform teams, maintainers, and engineers responding to production failures:</p>
+        <div class="panel callout"><strong>“This repository is broken. Find what is wrong, fix it, and give me proof.”</strong></div>
+        <p>The result is <strong>autonomous-debugger</strong>, a multi-primitive recipe that treats debugging as an evidence-producing workflow rather than a chat answer.</p>
+      </section>
+
+      <section>
+        <h2>The separation that matters</h2>
+        <p>There are two agents in this story. I used an AI coding agent to develop the recipe. But that development agent was not allowed to become the debugger. At runtime, the recipe itself receives only <code>REPO_URL</code>. GPT-5.6 Sol through a configurable model API becomes its reasoning layer, and Solari becomes its hands and its audit trail.</p>
+        <div class="panel flow">REPO_URL
+   │
+   ▼
+Solari sandbox #1 ── reproduce + capture failures
+   │
+   ▼
+GPT-5.6 Sol ─────── diagnose + generate unified diff
+   │
+   ▼
+Solari sandbox #2 ── fresh clone + patch + full tests
+   │ pass
+   ▼
+Solari browser ───── recorded evidence session
+   │
+   ▼
+incident-report.md + local rrweb replay</div>
+      </section>
+
+      <section>
+        <h2>A genuinely blind test</h2>
+        <p>A separate fault-injection workspace took the production <code>p-map</code> package, verified its baseline, and introduced four plausible regressions in four neutral-looking commits. It exposed the result through a private Git endpoint. The debugger got the clone URL - nothing else, and the endpoint is intentionally absent from every publishable artifact.</p>
+        <p>Its first sandbox reproduced 25 failures. The failures cut across ordering, skip handling, validation, concurrency, and backpressure, which is exactly what made this more realistic than handing a model a tidy bug description.</p>
+      </section>
+
+      <section>
+        <h2>The uncomfortable green build</h2>
+        <p>The first complete run was technically green: all 53 tests passed. It was also wrong. The generated patch repaired production behavior <em>and widened a timing assertion in a test</em>. The agent had changed the evidence used to judge itself.</p>
+        <div class="panel callout">A green check is not proof when the system under evaluation can edit the definition of green.</div>
+        <p>I rejected the run and strengthened the product rather than polishing the demo. The patch prompt now forbids test changes. More importantly, the patch tool independently parses every changed path and rejects test-file modifications before applying anything. Evidence creation is gated on a passing patch, and report inputs must match the exact patch and replay retained in verified state.</p>
+      </section>
+
+      <section>
+        <h2>What the debugger found</h2>
+        <table>
+          <thead><tr><th>Fault</th><th>Failure</th><th>Repair</th></tr></thead>
+          <tbody>
+            <tr><td>Config</td><td><code>concurrency</code> silently renamed to <code>concurrent</code></td><td>Restored the public option and dependent default</td></tr>
+            <tr><td>Filtering</td><td>Skip predicate inverted</td><td>Restored normal-value retention</td></tr>
+            <tr><td>Scheduling</td><td>Capacity guard changed from AND to OR</td><td>Required both limits to have capacity</td></tr>
+            <tr><td>Ordering</td><td>Index incremented before capture</td><td>Restored zero-based assignment order</td></tr>
+          </tbody>
+        </table>
+        <p>On the integrity-enforced run, the recipe succeeded on repair attempt two. The patch touched only <code>index.js</code>. A post-run comparison against the sealed manifest showed that its content exactly reversed every injected source change.</p>
+      </section>
+
+      <section>
+        <h2>Why three primitives, not one</h2>
+        <p>The inspection sandbox establishes the failure independently. The repair sandbox prevents accidental dependence on state left behind by inspection. The recorded browser turns a transient run into reviewable evidence. None of those roles is interchangeable.</p>
+        <p>The replay is rrweb NDJSON downloaded immediately after session release, because signed cloud URLs expire. A local player makes the artifact durable and inspectable.</p>
+        <a class="button" href="replay.html">Watch the evidence replay</a>
+        <a class="button secondary" href="https://github.com/mailtotanvir/solari-cookbook/tree/feat/autonomous-debugger/recipes/autonomous-debugger">View the recipe source</a>
+      </section>
+
+      <section>
+        <h2>Where this becomes a product</h2>
+        <p>The first customer is not “everyone who writes code.” It is the team paying an expensive interruption tax: platform engineers triaging failed upgrades, maintainers reproducing dependency regressions, support engineers escalating customer repositories, and SREs handling incidents where the first hour disappears into environment setup.</p>
+        <div class="panel">
+          <table>
+            <thead><tr><th>Buyer or user</th><th>Pain today</th><th>Benefit</th></tr></thead>
+            <tbody>
+              <tr><td>Platform and SRE teams</td><td>Senior engineers repeatedly rebuild failing environments</td><td>Sandbox reproduction turns an ambiguous ticket into a verified candidate fix</td></tr>
+              <tr><td>Developer-tool vendors</td><td>Support cannot safely run customer code on employee machines</td><td>Ephemeral execution contains untrusted workloads and preserves an audit trail</td></tr>
+              <tr><td>Open-source maintainers</td><td>Issue reports omit the context needed to reproduce failures</td><td>A consistent incident packet includes logs, patch, test result, and replay</td></tr>
+              <tr><td>Engineering leaders</td><td>AI-generated fixes are hard to govern or trust</td><td>Policy gates and clean-room verification make outcomes reviewable</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The wedge is automated bug reproduction and patch verification for CI failures. The broader platform opportunity is an evidence layer for agentic engineering: every autonomous change can be tied to the environment it ran in, the policy it passed, and the artifact a human can replay.</p>
+        <p>That changes the economics of debugging. The product does not promise to eliminate engineers; it compresses the low-leverage setup and reproduction loop so engineers spend their time on judgment. Value can be measured in mean time to reproduce, mean time to verified repair, escalation rate, first-pass acceptance, and reviewer minutes saved.</p>
+      </section>
+
+      <section>
+        <h2>What changed while building it</h2>
+        <ol>
+          <li><strong>Provider portability:</strong> a provider-specific assumption became a configurable model API using the Responses interface.</li>
+          <li><strong>Observable orchestration:</strong> phase logging and incomplete-turn recovery replaced a silent model loop.</li>
+          <li><strong>Cumulative retries:</strong> every retry still starts clean, but now receives the previous patch and verification output so it can produce a complete replacement.</li>
+          <li><strong>Test integrity:</strong> policy is enforced in code, not entrusted only to a prompt.</li>
+          <li><strong>Durable evidence:</strong> browser recordings are downloaded and paired with a local replay page before signed URLs expire.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>The lesson</h2>
+        <div class="panel callout good"><strong>Autonomy is not “the model wrote a patch.” Autonomy is a bounded system that can gather evidence, act in isolation, reject invalid success, recover from failure, and leave receipts.</strong></div>
+        <p>That is the contribution I want to make to the Solari cookbook: a small but complete pattern for turning cloud primitives into a trustworthy engineering workflow.</p>
+      </section>
+
+    </article>
+
+    <footer>Built with GPT-5.6 Sol through a configurable model API and Solari sandboxes + browser recording. No tests were harmed in the final run.</footer>
+  </div>
+</body>
+</html>
