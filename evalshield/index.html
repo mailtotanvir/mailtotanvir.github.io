@@ -443,6 +443,150 @@
       font-weight: 700;
     }
 
+    /* Animated Shadow Traffic Splitter Architecture Visual */
+    .shadow-viz-container {
+      background: linear-gradient(180deg, #0d1322 0%, #080c16 100%);
+      border: 1px solid var(--line-bright);
+      border-radius: 20px;
+      padding: 2.2rem 1.75rem;
+      margin: 3rem 0;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+    .shadow-viz-container::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, #3b82f6, #10b981, #8b5cf6);
+    }
+    .shadow-node-box {
+      background: var(--panel);
+      border: 1px solid var(--line-bright);
+      border-radius: 12px;
+      padding: 1.1rem 1.4rem;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+      transition: transform 0.2s;
+    }
+    .shadow-node-box:hover {
+      transform: translateY(-2px);
+      border-color: #38bdf8;
+    }
+    .shadow-node-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 0.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    .shadow-node-subtitle {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .shadow-flow-down {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0.85rem 0;
+      position: relative;
+    }
+    .shadow-arrow-line {
+      width: 2px;
+      height: 28px;
+      background: linear-gradient(to bottom, #3b82f6, #10b981);
+      position: relative;
+    }
+    .shadow-arrow-line::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: -3px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #38bdf8;
+      box-shadow: 0 0 8px #38bdf8;
+      animation: particleDown 2s infinite ease-in-out;
+    }
+    @keyframes particleDown {
+      0% { top: 0%; opacity: 0; }
+      20% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+    .shadow-split-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 1rem;
+      position: relative;
+    }
+    @media (max-width: 720px) {
+      .shadow-split-layout { grid-template-columns: 1fr; }
+    }
+    .shadow-branch {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 1.3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .shadow-branch.sync-branch {
+      border-top: 3px solid #10b981;
+    }
+    .shadow-branch.async-branch {
+      border-top: 3px solid #8b5cf6;
+    }
+    .shadow-branch-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 0.25rem 0.65rem;
+      border-radius: 6px;
+      align-self: flex-start;
+    }
+    .sync-tag {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .async-tag {
+      background: rgba(139, 92, 246, 0.15);
+      color: #a78bfa;
+      border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+    .shadow-item-list {
+      list-style: none;
+      font-size: 0.86rem;
+      color: #cbd5e1;
+      margin-top: 0.5rem;
+    }
+    .shadow-item-list li {
+      margin-bottom: 0.35rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.45rem;
+    }
+    .shadow-item-list li::before {
+      content: "•";
+      color: #38bdf8;
+      font-weight: bold;
+    }
+
     /* Code Blocks */
     pre {
       background: #060911;
@@ -722,10 +866,98 @@ report = AssertionEngine().run_suite_evaluations(graph)
 
 print(f"Safety Verdict: {report.status} | Passed: {report.passed_assertions}/{report.total_assertions}")</code></pre>
 
-    <h2>4. The Key Differentiator: Live Shadow Traffic Splitting & Tool Sandboxing</h2>
+    <h2>4. ShadowTrafficSplitter — How It Works (The Key Differentiator)</h2>
     <p>In classical web architectures, traffic mirroring (shadowing) is simple: you copy an HTTP payload to a secondary service and discard the response. In <strong>multi-agent autonomous systems</strong>, however, naive shadowing is lethal. If a candidate agent has access to external tools (issuing refunds, writing SQL rows, sending customer emails, or triggering webhooks), running it on live production traffic would cause catastrophic, real-world double execution.</p>
 
     <p>EvalShield resolves this fundamental engineering barrier through a dedicated <strong>Asynchronous Shadow Traffic Splitter</strong> coupled with <strong>State-Virtualizing Tool Sandboxes</strong>.</p>
+
+    <!-- Animated ShadowTrafficSplitter Flow Architecture Diagram -->
+    <div class="shadow-viz-container">
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <span class="shadow-branch-tag sync-tag" style="margin-bottom: 0.5rem;">Live Traffic Ingestion</span>
+        <h4 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.25rem; color: #ffffff;">ShadowTrafficSplitter Routing Architecture</h4>
+      </div>
+
+      <!-- Top Node: Incoming Request -->
+      <div class="shadow-node-box" style="border-color: #38bdf8; max-width: 480px; margin: 0 auto;">
+        <div class="shadow-node-title">
+          <span>📨 Incoming User Request</span>
+        </div>
+        <div class="shadow-node-subtitle" style="color: #38bdf8;">"Refund transaction #9901"</div>
+      </div>
+
+      <!-- Flow Down to Splitter -->
+      <div class="shadow-flow-down">
+        <div class="shadow-arrow-line"></div>
+      </div>
+
+      <!-- Center Node: ShadowTrafficSplitter Hub -->
+      <div class="shadow-node-box" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95)); border-color: var(--mint); max-width: 520px; margin: 0 auto;">
+        <div class="shadow-node-title" style="color: var(--mint);">
+          <span>🔀 ShadowTrafficSplitter</span>
+        </div>
+        <div class="shadow-node-subtitle">Asynchronous Traffic Decoupler &amp; Isolation Barrier</div>
+      </div>
+
+      <!-- Flow Split Down -->
+      <div class="shadow-flow-down">
+        <div class="shadow-arrow-line"></div>
+      </div>
+
+      <!-- Side-by-side Branches -->
+      <div class="shadow-split-layout">
+        <!-- Synchronous Path -->
+        <div class="shadow-branch sync-branch">
+          <span class="shadow-branch-tag sync-tag">⚡ Synchronous Path (Production)</span>
+          <div class="shadow-node-box">
+            <div class="shadow-node-title" style="color: #10b981;">Production Agent (v1.0)</div>
+            <ul class="shadow-item-list">
+              <li>Real DB &amp; Live Tool Execution</li>
+              <li>Real Payment Gateway Settlement</li>
+              <li>Immutable Trajectory DAG Tracked</li>
+            </ul>
+          </div>
+          <div class="shadow-flow-down">
+            <div class="shadow-arrow-line"></div>
+          </div>
+          <div class="shadow-node-box" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.4);">
+            <div class="shadow-node-title" style="color: #10b981; font-size: 0.95rem;">Immediate HTTP 200 to User</div>
+            <div class="shadow-node-subtitle" style="color: #34d399; font-weight: 700;">(0ms Added User Overhead)</div>
+          </div>
+        </div>
+
+        <!-- Asynchronous Fork -->
+        <div class="shadow-branch async-branch">
+          <span class="shadow-branch-tag async-tag">🔄 Asynchronous Fork (Shadow Candidate)</span>
+          <div class="shadow-node-box">
+            <div class="shadow-node-title" style="color: #a78bfa;">Candidate Agent (v2.0 Beta)</div>
+            <ul class="shadow-item-list">
+              <li>Runs in Background Thread Worker Pool</li>
+              <li>Tool Virtualization &amp; Mock Gateway</li>
+              <li>100% Isolated from Production State</li>
+            </ul>
+          </div>
+          <div class="shadow-flow-down">
+            <div class="shadow-arrow-line"></div>
+          </div>
+          <div class="shadow-node-box">
+            <div class="shadow-node-title" style="color: #c084fc; font-size: 0.95rem;">Candidate Trajectory DAG Built</div>
+            <div class="shadow-node-subtitle">Hermetic Step Recording</div>
+          </div>
+          <div class="shadow-flow-down">
+            <div class="shadow-arrow-line"></div>
+          </div>
+          <div class="shadow-node-box" style="background: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.4);">
+            <div class="shadow-node-title" style="color: #a78bfa; font-size: 0.95rem;">⚖️ Shadow Diff Engine</div>
+            <ul class="shadow-item-list">
+              <li>Tool Sequence Levenshtein Distance</li>
+              <li>Semantic Cosine Divergence</li>
+              <li>Step &amp; Cost Inflation Alerting</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div class="callout-box">
       <h4>⚡ Eliminating the "Canary Dilemma" with 0ms Added Overhead</h4>
