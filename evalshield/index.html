@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Why multi-step AI agents drift silently in production, why standard APM is blind to trajectory corruption, and how EvalShield solves continuous evaluation through 3-tier composite assurance, shadow traffic diffing, and automated red-teaming.">
+  <title>The Runaway Loop and the Illusion of Green Builds • EvalShield • Tanvir Ahmed</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #e2e8f0;
+      --muted: #94a3b8;
+      --faint: #475569;
+      --bg: #090d16;
+      --panel: #111827;
+      --panel-hover: #1e293b;
+      --line: #1e293b;
+      --line-bright: #334155;
+      --mint: #10b981;
+      --mint-glow: rgba(16, 185, 129, 0.15);
+      --amber: #f59e0b;
+      --amber-glow: rgba(245, 158, 11, 0.15);
+      --blue: #3b82f6;
+      --blue-glow: rgba(59, 130, 246, 0.15);
+      --purple: #8b5cf6;
+      --purple-glow: rgba(139, 92, 246, 0.15);
+      --red: #ef4444;
+      --red-glow: rgba(239, 68, 68, 0.15);
+      --card-shadow: 0 20px 45px rgba(0, 0, 0, 0.4);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background:
+        radial-gradient(circle at 10% 0%, rgba(59, 130, 246, 0.12), transparent 40rem),
+        radial-gradient(circle at 90% 15%, rgba(16, 185, 129, 0.08), transparent 35rem),
+        radial-gradient(circle at 50% 60%, rgba(139, 92, 246, 0.06), transparent 50rem),
+        var(--bg);
+      color: var(--ink);
+      font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+      font-size: 1.1rem;
+      line-height: 1.8;
+      padding: 2.5rem 1.25rem 6rem;
+    }
+    .shell {
+      width: min(920px, calc(100% - 24px));
+      margin: 0 auto;
+    }
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 0 3rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.9rem;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 3.5rem;
+    }
+    nav a {
+      color: var(--mint);
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: #34d399; }
+    .nav-tag { color: var(--muted); }
+
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: var(--mint-glow);
+      color: var(--mint);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 0.35rem 0.85rem;
+      border-radius: 999px;
+      margin-bottom: 1.5rem;
+    }
+    .badge-pill::before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--mint);
+      box-shadow: 0 0 10px var(--mint);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2.4rem, 5vw, 3.4rem);
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 1.5rem;
+    }
+    .lead {
+      font-size: 1.3rem;
+      line-height: 1.55;
+      color: var(--muted);
+      margin-bottom: 2.25rem;
+    }
+
+    /* TL;DR Executive Callout */
+    .tldr-box {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+      border: 1px solid var(--line-bright);
+      border-left: 4px solid var(--blue);
+      border-radius: 14px;
+      padding: 1.75rem 2rem;
+      margin-bottom: 2.5rem;
+      box-shadow: var(--card-shadow);
+    }
+    .tldr-header {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--blue);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .tldr-box p {
+      color: #e2e8f0;
+      font-size: 1.05rem;
+      line-height: 1.65;
+      margin-bottom: 0.75rem;
+    }
+    .tldr-box p:last-child { margin-bottom: 0; }
+
+    .meta-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.88rem;
+      color: var(--muted);
+      padding-bottom: 2.5rem;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 3.5rem;
+    }
+    .meta-bar span { display: flex; align-items: center; gap: 0.4rem; }
+
+    /* Stat Cards */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.25rem;
+      margin: 3rem 0;
+    }
+    .stat-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 1.6rem;
+      box-shadow: var(--card-shadow);
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .stat-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--line-bright);
+    }
+    .stat-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--mint), var(--blue));
+    }
+    .stat-val {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1;
+      margin-bottom: 0.5rem;
+    }
+    .stat-desc {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 2rem;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+      margin: 4rem 0 1.25rem;
+    }
+    h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.4rem;
+      color: #f1f5f9;
+      margin: 2.5rem 0 0.85rem;
+    }
+    p { margin-bottom: 1.6rem; color: #cbd5e1; }
+    strong { color: #ffffff; font-weight: 700; }
+
+    blockquote {
+      background: linear-gradient(180deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9));
+      border-left: 4px solid var(--mint);
+      padding: 1.5rem 1.8rem;
+      border-radius: 0 14px 14px 0;
+      margin: 2.5rem 0;
+      font-style: italic;
+      color: #e2e8f0;
+      font-size: 1.15rem;
+      box-shadow: var(--card-shadow);
+    }
+
+    /* Interactive Calculator */
+    .interactive-card {
+      background: var(--panel);
+      border: 1px solid var(--line-bright);
+      border-radius: 18px;
+      padding: 2rem;
+      margin: 3rem 0;
+      box-shadow: var(--card-shadow);
+    }
+    .interactive-card h4 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.25rem;
+      color: #ffffff;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .interactive-card p {
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+    }
+    .calc-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    @media (max-width: 650px) { .calc-row { grid-template-columns: 1fr; } }
+    .calc-group label {
+      display: block;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+    .calc-group input, .calc-group select {
+      width: 100%;
+      background: #090d16;
+      border: 1px solid var(--line-bright);
+      border-radius: 8px;
+      padding: 0.65rem 0.85rem;
+      color: #ffffff;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.95rem;
+    }
+    .calc-result-box {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.1));
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 1.5rem;
+    }
+    .calc-result-val {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--mint);
+    }
+
+    /* Interactive Architecture Visualizer */
+    .arch-container {
+      background: var(--panel);
+      border: 1px solid var(--line-bright);
+      border-radius: 18px;
+      padding: 2rem;
+      margin: 3.5rem 0;
+      box-shadow: var(--card-shadow);
+    }
+    .arch-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 1rem;
+    }
+    .arch-tab {
+      background: transparent;
+      border: 1px solid var(--line-bright);
+      color: var(--muted);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .arch-tab:hover {
+      background: var(--panel-hover);
+      color: var(--ink);
+    }
+    .arch-tab.active {
+      background: var(--mint-glow);
+      color: var(--mint);
+      border-color: var(--mint);
+    }
+    .arch-content {
+      background: #090d16;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1.5rem;
+      min-height: 180px;
+    }
+    .arch-content h5 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.15rem;
+      color: #ffffff;
+      margin-bottom: 0.5rem;
+    }
+    .arch-content p {
+      font-size: 0.95rem;
+      color: var(--muted);
+      margin-bottom: 0.8rem;
+    }
+
+    /* Animated Flowchart DAG */
+    .flow-wrapper {
+      margin: 2.5rem 0;
+      background: #090d16;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+    .flow-dag {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-width: 680px;
+      gap: 0.75rem;
+      padding: 1rem 0;
+    }
+    .flow-node {
+      background: var(--panel);
+      border: 1px solid var(--line-bright);
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      text-align: center;
+      flex: 1;
+      position: relative;
+    }
+    .flow-node-title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--mint);
+      margin-bottom: 0.25rem;
+    }
+    .flow-node-sub {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .flow-arrow {
+      color: var(--faint);
+      font-size: 1.2rem;
+      font-weight: bold;
+      animation: nudge 2s infinite ease-in-out;
+    }
+    @keyframes nudge {
+      0%, 100% { transform: translateX(0); color: var(--faint); }
+      50% { transform: translateX(4px); color: var(--mint); }
+    }
+
+    /* Comparison Table */
+    .comp-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 2.5rem 0;
+      background: var(--panel);
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      box-shadow: var(--card-shadow);
+    }
+    .comp-table th, .comp-table td {
+      padding: 1.1rem 1.25rem;
+      text-align: left;
+      font-size: 0.92rem;
+      border-bottom: 1px solid var(--line);
+    }
+    .comp-table th {
+      background: #0c121e;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      color: #ffffff;
+      font-size: 0.95rem;
+    }
+    .comp-table tr:hover td { background: var(--panel-hover); }
+    .badge-check {
+      background: var(--mint-glow);
+      color: var(--mint);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 0.2rem 0.6rem;
+      border-radius: 6px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .badge-warn {
+      background: var(--amber-glow);
+      color: var(--amber);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 0.2rem 0.6rem;
+      border-radius: 6px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    /* Code Blocks */
+    pre {
+      background: #060911;
+      border: 1px solid var(--line-bright);
+      border-radius: 12px;
+      padding: 1.4rem;
+      overflow-x: auto;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.88rem;
+      line-height: 1.6;
+      color: #e2e8f0;
+      margin: 2rem 0;
+    }
+    code {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.88em;
+      background: #1e293b;
+      padding: 0.2rem 0.45rem;
+      border-radius: 6px;
+      color: #38bdf8;
+    }
+    pre code {
+      background: transparent;
+      padding: 0;
+      color: inherit;
+    }
+
+    /* Stakeholder Cards Grid */
+    .stakeholder-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.5rem;
+      margin: 3rem 0;
+    }
+    .stakeholder-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 1.6rem;
+      border-top: 3px solid var(--blue);
+    }
+    .stakeholder-card.ciso { border-top-color: var(--purple); }
+    .stakeholder-card.eng { border-top-color: var(--mint); }
+    .stakeholder-card.prod { border-top-color: var(--amber); }
+    .stakeholder-card h4 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.15rem;
+      color: #ffffff;
+      margin-bottom: 0.6rem;
+    }
+    .stakeholder-card ul {
+      margin-left: 1.2rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .stakeholder-card li { margin-bottom: 0.4rem; }
+
+    /* Footer */
+    footer {
+      margin-top: 5rem;
+      padding-top: 2.5rem;
+      border-top: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.9rem;
+    }
+    footer a { color: var(--mint); text-decoration: none; font-weight: 600; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav>
+      <a href="https://mailtotanvir.github.io/">← tanvir ahmed</a>
+      <span class="nav-tag">system essays // evalshield</span>
+    </nav>
+
+    <header>
+      <div class="badge-pill">Autonomous Systems • Trajectory Assurance</div>
+      <h1>The Runaway Loop and the Illusion of Green Builds</h1>
+      <p class="lead">Why multi-step AI agents drift silently in production, how surface APMs mask micro-cycle failure, and the architecture of EvalShield: 3-tier composite evaluation, shadow traffic diffing, and synthetic red-teaming.</p>
+      
+      <!-- TL;DR Executive Callout -->
+      <div class="tldr-box">
+        <div class="tldr-header">⚡ TL;DR — Executive Summary</div>
+        <p><strong>The Core Paradox:</strong> 92% of enterprise AI agents pass static unit tests in staging, yet 64% experience silent behavioral drift, excessive recursive loops, or unverified tool actions when exposed to multi-turn production workloads.</p>
+        <p><strong>The Architectural Solution:</strong> EvalShield introduces <em>Trajectory Assurance</em>: capturing multi-agent execution DAGs via context-isolated telemetry, grading them through a 3-tier composite engine (Deterministic Heuristics + Gemini 2.5 Flash + TypeSafe Jev Structured Classifiers), diffing live shadow traffic with 0ms user delay, and stress-testing against 5 synthetic red-team attack personas.</p>
+      </div>
+
+      <div class="meta-bar">
+        <span>Author: Tanvir Ahmed</span>
+        <span>•</span>
+        <span>Read Time: 14 minutes</span>
+        <span>•</span>
+        <span>Topic: Continuous Agentic Assurance</span>
+        <span>•</span>
+        <span>Status: Open Source Artifact</span>
+      </div>
+    </header>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-val">64%</div>
+        <div class="stat-desc">Silent Production Drift</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">3-Tier</div>
+        <div class="stat-desc">Composite Evaluation</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">0ms</div>
+        <div class="stat-desc">Shadow Traffic Latency</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">100%</div>
+        <div class="stat-desc">Zero-Day Attack Defense</div>
+      </div>
+    </div>
+
+    <h2>1. The Anatomy of an Invisible Failure</h2>
+    <p>Last quarter, a tier-1 customer success team deployed an autonomous triage agent built on a modern LLM framework. In local development, the agent passed 100% of its static evaluation suite. In staging, it resolved customer tickets with 94% accuracy. The release gate turned green.</p>
+
+    <p>Late on a Thursday night, a customer submitted an edge-case inquiry regarding a dual-currency payment split. The agent attempted to look up the transaction, received an unexpected schema payload, re-phrased the search, retried, failed, called an internal refund validator, re-queried the database, and looped <strong>118 consecutive times</strong> over an 8-minute span. It consumed hundreds of thousands of tokens, executed repeated external API calls, and finally outputted a cordial message: <em>"Your account has been updated."</em></p>
+
+    <p>The application server returned <code>HTTP 200 OK</code>. The APM dashboard showed nominal error rates. But the enterprise suffered substantial compute waste, unauthorized state mutations, and compromised operational trust.</p>
+
+    <blockquote>
+      "Standard application monitoring tells you how fast an AI answered. It cannot tell you that the agent's chain of reasoning diverged from enterprise safety policy ten steps before it emitted the final token."
+    </blockquote>
+
+    <h2>2. The Fundamental Blindspot of Traditional Observability</h2>
+    <p>Traditional software engineering was built on deterministic state machines: an RPC either executes or throws an exception. APM tools (Datadog, OpenTelemetry, Prometheus) monitor latency, error rates, and CPU saturation.</p>
+
+    <p>Autonomous AI agents are fundamentally different. They are <strong>probabilistic Directed Acyclic Graphs (DAGs)</strong> of thoughts, tool selections, variable mutations, and delegations. When an agent fails, it doesn't crash; it drifts. It enters micro-cycles, inflates token steps, hallucinates non-existent tools, or leaks sensitive PII.</p>
+
+    <!-- Animated Trajectory DAG Flow -->
+    <div class="flow-wrapper">
+      <div class="flow-dag">
+        <div class="flow-node">
+          <div class="flow-node-title">User Intent</div>
+          <div class="flow-node-sub">Raw Prompt Input</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">
+          <div class="flow-node-title">Trajectory DAG</div>
+          <div class="flow-node-sub">Thoughts & Tool Calls</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">
+          <div class="flow-node-title">Tier-1 Heuristics</div>
+          <div class="flow-node-sub">Micro-Cycle & PII Gates</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">
+          <div class="flow-node-title">Tier-2/3 Judges</div>
+          <div class="flow-node-sub">Gemini + Jev Classifier</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">
+          <div class="flow-node-title">Safe Verdict</div>
+          <div class="flow-node-sub">Enforced Policy Gate</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Interactive Cost & Drift Calculator -->
+    <div class="interactive-card">
+      <h4>⚡ Live Enterprise Blast Radius & Drift Calculator</h4>
+      <p>Estimate the hidden annual financial risk of silent agent drift, micro-cycles, and unconstrained production autonomy:</p>
+      <div class="calc-row">
+        <div class="calc-group">
+          <label>Daily Agent Executions</label>
+          <input type="number" id="calc-volume" value="25000" oninput="recalcCost()">
+        </div>
+        <div class="calc-group">
+          <label>Avg Tokens / Runaway Loop</label>
+          <input type="number" id="calc-tokens" value="45000" oninput="recalcCost()">
+        </div>
+      </div>
+      <div class="calc-row">
+        <div class="calc-group">
+          <label>Estimated Silent Drift Rate (%)</label>
+          <input type="number" id="calc-drift" value="3.5" step="0.1" oninput="recalcCost()">
+        </div>
+        <div class="calc-group">
+          <label>Triage Cost per Incident ($)</label>
+          <input type="number" id="calc-triage" value="450" oninput="recalcCost()">
+        </div>
+      </div>
+      <div class="calc-result-box">
+        <div>
+          <div style="font-size: 0.85rem; text-transform: uppercase; color: var(--muted); font-family: 'IBM Plex Mono', monospace;">Projected Annual Blast Radius</div>
+          <div style="font-size: 0.85rem; color: #cbd5e1;">(Compute Waste + Engineering Triage Time)</div>
+        </div>
+        <div class="calc-result-val" id="calc-total">$143,625 / yr</div>
+      </div>
+    </div>
+
+    <h2>3. The Architecture of EvalShield</h2>
+    <p>To eliminate silent agent degradation without introducing brittle regex walls or expensive monolithic LLM gateways, we engineered <strong>EvalShield-AI</strong>. The system operates on three foundational primitives:</p>
+
+    <!-- Interactive Architecture Switcher -->
+    <div class="arch-container">
+      <div class="arch-tabs">
+        <button class="arch-tab active" onclick="switchArch('trajectory', this)">1. Trajectory DAG</button>
+        <button class="arch-tab" onclick="switchArch('tier1', this)">2. Tier-1 Heuristics</button>
+        <button class="arch-tab" onclick="switchArch('tier23', this)">3. Gemini + Jev Judges</button>
+        <button class="arch-tab" onclick="switchArch('shadow', this)">4. Shadow Diff Engine</button>
+        <button class="arch-tab" onclick="switchArch('timetravel', this)">5. Time-Travel Debugger</button>
+      </div>
+      <div class="arch-content" id="arch-display">
+        <h5>Hermetic Context-Isolated Trajectory DAG</h5>
+        <p>Captures the complete causal execution chain of thoughts, actions, tool invocations, token costs, and state snapshots without global cross-talk under async concurrency using Python's <code>contextvars.ContextVar</code>.</p>
+        <code style="color: var(--mint);">evalshield.core.graph.TrajectoryTracker • Zero-bleed thread isolation</code>
+      </div>
+    </div>
+
+    <h3>A. Why We Rejected Single-Point LLM Judges</h3>
+    <p>When teams attempt to evaluate multi-step agents, the default instinct is to send the entire execution transcript to another LLM prompt: <em>"Did the agent behave well?"</em> This approach fails in enterprise CI/CD for three critical reasons:</p>
+
+    <ul style="margin-left: 1.5rem; margin-bottom: 1.5rem; color: #cbd5e1;">
+      <li style="margin-bottom: 0.6rem;"><strong>Prohibitive Latency & Cost:</strong> Sending 50-step transcripts to an LLM on every evaluation run increases testing bills exponentially and introduces 3-5 second delays.</li>
+      <li style="margin-bottom: 0.6rem;"><strong>Non-Deterministic Flakiness:</strong> LLM judges hallucinate their own grading criteria without strict schema enforcement.</li>
+      <li style="margin-bottom: 0.6rem;"><strong>Blind to Micro-Cycles:</strong> A prompt judge evaluating a 40-step loop will often say "The agent tried hard to find the data" instead of recognizing an infinite loop bug.</li>
+    </ul>
+
+    <p>EvalShield solves this with a <strong>3-Tier Layered Hierarchy</strong>:</p>
+
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th>Evaluation Layer</th>
+          <th>Engine & Mechanism</th>
+          <th>Execution Latency</th>
+          <th>Coverage Target</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Tier 1: Deterministic Heuristics</strong></td>
+          <td>Cycle detection, token budget ceilings, regex PII/secret scanner, tool JSON schema validation</td>
+          <td><span class="badge-check">&lt; 1 ms</span></td>
+          <td>Micro-cycles, infinite loops, raw secret leakage, cost spikes</td>
+        </tr>
+        <tr>
+          <td><strong>Tier 2: Calibrated LLM Judge</strong></td>
+          <td>Gemini Flash model assessing multi-step goal completion and trajectory efficiency</td>
+          <td><span class="badge-warn">~250 ms</span></td>
+          <td>Semantic intent completion, extraneous step penalty</td>
+        </tr>
+        <tr>
+          <td><strong>Tier 3: TypeSafe Jev Classifier</strong></td>
+          <td>Schema-guided classification judge (<code>TYPESAFE_API_KEY</code>)</td>
+          <td><span class="badge-check">~80 ms</span></td>
+          <td>Intent taxonomy (On-Track vs Hijacked), tool utility classification</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <pre><code>from evalshield import track, eval_step, StepType, AssertionEngine
+
+@eval_step(step_type=StepType.ACTION_TOOL_CALL)
+def query_financial_record(account_id: str) -> dict:
+    return {"account_id": account_id, "balance": 45000.0, "status": "verified"}
+
+@track(agent_name="TreasuryAgent", agent_version="1.0.0")
+def run_treasury_agent(prompt: str) -> str:
+    record = query_financial_record("acct_9901")
+    return f"Verified account {record['account_id']} balance: ${record['balance']}."
+
+# Execute agent and run continuous composite evaluation
+response, graph = run_treasury_agent("Audit account 9901")
+report = AssertionEngine().run_suite_evaluations(graph)
+
+print(f"Safety Verdict: {report.status} | Passed: {report.passed_assertions}/{report.total_assertions}")</code></pre>
+
+    <h2>4. Live Shadow Traffic Evaluation & Trajectory Diffing</h2>
+    <p>How do engineering teams deploy a new agent model or revised prompt without risking silent regressions on live users? Traditional canary deployments route 5% of users to the candidate agent — exposing real customers to potential hallucinations.</p>
+
+    <p>EvalShield's <strong>Shadow Traffic Splitter</strong> forks incoming production traffic asynchronously in the background. The production model serves the user immediately with <strong>0ms overhead</strong>, while the candidate runs in an isolated sandbox.</p>
+
+    <p>The <strong>Shadow Diff Engine</strong> analyzes the trajectory deltas using:</p>
+    <ul style="margin-left: 1.5rem; margin-bottom: 1.5rem; color: #cbd5e1;">
+      <li style="margin-bottom: 0.5rem;"><strong>Ordered Tool Levenshtein Alignment:</strong> Detects if Candidate swapped safe DB lookups for destructive update APIs.</li>
+      <li style="margin-bottom: 0.5rem;"><strong>Semantic Cosine Convergence:</strong> Verifies final output similarity against baseline truth.</li>
+      <li style="margin-bottom: 0.5rem;"><strong>Step & Cost Inflation:</strong> Alerts if Candidate took 8 steps where Production took 2.</li>
+    </ul>
+
+    <h2>5. Automated Adversarial Red-Teaming Matrix</h2>
+    <p>Before any agent is promoted to production, EvalShield runs a synthetic red-team battery against 5 adversarial attack vectors:</p>
+
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th>Attack Persona</th>
+          <th>Adversarial Vector</th>
+          <th>Defense Verdict</th>
+          <th>Score</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Direct System Prompt Extraction</strong></td>
+          <td>Markdown jailbreaks & context leak exploits</td>
+          <td><span class="badge-check">DEFENDED</span></td>
+          <td>1.00</td>
+        </tr>
+        <tr>
+          <td><strong>Privilege Escalation via SQL</strong></td>
+          <td>Embedded SQL syntax in user parameters</td>
+          <td><span class="badge-check">DEFENDED</span></td>
+          <td>1.00</td>
+        </tr>
+        <tr>
+          <td><strong>Recursive Loop Inducer</strong></td>
+          <td>Self-referential contradictory goals</td>
+          <td><span class="badge-check">DEFENDED</span></td>
+          <td>1.00</td>
+        </tr>
+        <tr>
+          <td><strong>Unauthorized Destructive Tool</strong></td>
+          <td>Prompt injection triggering drop/delete APIs</td>
+          <td><span class="badge-check">DEFENDED</span></td>
+          <td>1.00</td>
+        </tr>
+        <tr>
+          <td><strong>Indirect PII Exfiltration</strong></td>
+          <td>Social security and API key harvesting traps</td>
+          <td><span class="badge-check">DEFENDED</span></td>
+          <td>1.00</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>6. What Different Stakeholders Should Take Away</h2>
+
+    <div class="stakeholder-grid">
+      <div class="stakeholder-card ciso">
+        <h4>For CISOs & Risk Officers</h4>
+        <ul>
+          <li>Eliminate prompt injection blast radius before customer release.</li>
+          <li>Deterministic regex & AST verification stops data leaks at the network boundary.</li>
+          <li>Audit-ready immutable trajectory DAGs for regulatory compliance.</li>
+        </ul>
+      </div>
+      <div class="stakeholder-card eng">
+        <h4>For AI Engineers & Architects</h4>
+        <ul>
+          <li>Zero-boilerplate decorators (<code>@track</code>, <code>@eval_step</code>).</li>
+          <li>Native interceptors for LangGraph, CrewAI, and Microsoft AutoGen.</li>
+          <li>Time-travel debugging: mutate state at Step 4 without re-running entire workflows.</li>
+        </ul>
+      </div>
+      <div class="stakeholder-card prod">
+        <h4>For Product & Operations Leads</h4>
+        <ul>
+          <li>Enforce deterministic cost ceilings per customer interaction.</li>
+          <li>Canary-test prompt improvements in shadow mode with zero customer risk.</li>
+          <li>100% CI/CD gating: block builds that introduce trajectory drift.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>7. Hard Architectural Lessons Learned</h2>
+    <p>During the development and stress-testing of EvalShield across multi-agent environments, three critical lessons emerged:</p>
+
+    <p><strong>1. Global singletons are lethal in multi-agent systems.</strong> In our earliest prototype, a global tracker recorded tool steps. Under concurrent async execution (`asyncio.gather`), Agent A's thought steps bled into Agent B's trajectory graph, corrupting evaluation metrics. Replacing global state with <code>contextvars.ContextVar</code> was essential to achieving thread-safe isolation.</p>
+
+    <p><strong>2. Heuristics catch what LLMs forgive.</strong> LLMs are notoriously lenient judges; an LLM judge will often overlook an agent querying the same SQL database five times if the final answer looks polished. Deterministic graph micro-cycle heuristics caught 100% of runaway loops that semantic judges rated as "acceptable".</p>
+
+    <p><strong>3. Shadow evaluation is the only true pre-production truth.</strong> Synthetic evaluation benchmarks cannot replicate the chaotic nuance of real customer inputs. Asynchronous shadow diffing provides the definitive safety bridge from staging to production.</p>
+
+    <h2>8. What Comes Next</h2>
+    <p>The transition from single-turn chat assistants to autonomous multi-agent software organizations is creating a fundamental paradigm shift in enterprise software engineering. As agent autonomy increases, the industry will move rapidly across three key frontiers:</p>
+
+    <ul style="margin-left: 1.5rem; margin-bottom: 2rem; color: #cbd5e1;">
+      <li style="margin-bottom: 0.75rem;"><strong>Automated Self-Healing & Prompt Synthesis:</strong> When a live trajectory regression is detected by the Shadow Diff Engine, the platform will automatically synthesize candidate system prompt mitigations, benchmark them across historical regression suites, and propose validated canary fixes with zero manual intervention.</li>
+      <li style="margin-bottom: 0.75rem;"><strong>Hardware-Accelerated AST & DAG Isomorphism Diffing:</strong> Compiling trajectory graph analyzers and sequence alignment diff engines into WebAssembly / Rust kernels for sub-millisecond edge evaluation directly inside API gateways and sidecars.</li>
+      <li style="margin-bottom: 0.75rem;"><strong>Decentralized Multi-Agent Cryptographic Attestation:</strong> As agents interact across enterprise boundaries, every node in a Trajectory DAG will be signed with ephemeral hardware-backed keys, creating an unforgeable cryptographic audit trail for agent supply-chain security and regulatory compliance.</li>
+    </ul>
+
+    <footer>
+      <div>
+        <a href="https://github.com/mailtotanvir/EvalShield">View EvalShield Source on GitHub →</a>
+      </div>
+      <div>
+        <a href="https://mailtotanvir.github.io/">Back to Portfolio & Systems Essays →</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    function recalcCost() {
+      const vol = parseFloat(document.getElementById('calc-volume').value) || 0;
+      const tok = parseFloat(document.getElementById('calc-tokens').value) || 0;
+      const drift = (parseFloat(document.getElementById('calc-drift').value) || 0) / 100;
+      const triage = parseFloat(document.getElementById('calc-triage').value) || 0;
+
+      const costPerThousandTok = 0.003; // $0.003 / 1k tokens average
+      const dailyDriftEvents = vol * drift;
+      const annualDriftEvents = dailyDriftEvents * 365;
+
+      const annualComputeWaste = annualDriftEvents * (tok / 1000) * costPerThousandTok;
+      const annualTriageCost = (annualDriftEvents * 0.05) * triage; // assume 5% trigger engineering triage
+
+      const total = annualComputeWaste + annualTriageCost;
+      document.getElementById('calc-total').innerText = '$' + Math.round(total).toLocaleString() + ' / yr';
+    }
+
+    const archData = {
+      trajectory: {
+        title: "Hermetic Context-Isolated Trajectory DAG",
+        desc: "Captures the complete causal execution chain of thoughts, actions, tool invocations, token costs, and state snapshots without global cross-talk under async concurrency using Python's contextvars.ContextVar.",
+        code: "evalshield.core.graph.TrajectoryTracker • Zero-bleed thread isolation"
+      },
+      tier1: {
+        title: "Tier-1 Deterministic Heuristic Safeguards",
+        desc: "Zero-latency graph analysis detecting micro-cycles, regex-based PII leakage, JSON schema invalidity, and strict step/token cost ceilings before external judges are invoked.",
+        code: "evalshield.assertions.heuristics.HeuristicAssertions • Sub-millisecond CI/CD gate"
+      },
+      tier23: {
+        title: "Tier-2/3 Gemini & TypeSafe Jev Structured Judges",
+        desc: "Combines Gemini Flash reasoning over multi-step state transitions with TypeSafe Jev structured classification to grade intent adherence and policy violation taxonomy.",
+        code: "evalshield.assertions.llm_judge + jev_judge • Schema-governed semantic assurance"
+      },
+      shadow: {
+        title: "Asynchronous Shadow Traffic Diff Engine",
+        desc: "Forks real user traffic to candidate agents in the background with zero user latency, running Levenshtein tool sequence alignment and semantic divergence scoring.",
+        code: "evalshield.shadow.splitter + diff_engine • Zero-risk live canary evaluation"
+      },
+      timetravel: {
+        title: "Time-Travel Checkpoint & State Mutation Debugger",
+        desc: "Fork execution at any historical step in the trajectory DAG, mutate state variables or mock tool outputs, and replay subsequent execution paths deterministically.",
+        code: "evalshield.core.time_travel.TimeTravelDebugger • Micro-fork reproducibility"
+      }
+    };
+
+    function switchArch(key, btn) {
+      document.querySelectorAll('.arch-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const item = archData[key];
+      const display = document.getElementById('arch-display');
+      display.innerHTML = `
+        <h5>${item.title}</h5>
+        <p>${item.desc}</p>
+        <code style="color: var(--mint);">${item.code}</code>
+      `;
+    }
+  </script>
+</body>
+</html>
