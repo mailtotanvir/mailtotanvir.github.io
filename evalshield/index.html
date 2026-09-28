@@ -722,17 +722,72 @@ report = AssertionEngine().run_suite_evaluations(graph)
 
 print(f"Safety Verdict: {report.status} | Passed: {report.passed_assertions}/{report.total_assertions}")</code></pre>
 
-    <h2>4. Live Shadow Traffic Evaluation & Trajectory Diffing</h2>
-    <p>How do engineering teams deploy a new agent model or revised prompt without risking silent regressions on live users? Traditional canary deployments route 5% of users to the candidate agent — exposing real customers to potential hallucinations.</p>
+    <h2>4. The Key Differentiator: Live Shadow Traffic Splitting & Tool Sandboxing</h2>
+    <p>In classical web architectures, traffic mirroring (shadowing) is simple: you copy an HTTP payload to a secondary service and discard the response. In <strong>multi-agent autonomous systems</strong>, however, naive shadowing is lethal. If a candidate agent has access to external tools (issuing refunds, writing SQL rows, sending customer emails, or triggering webhooks), running it on live production traffic would cause catastrophic, real-world double execution.</p>
 
-    <p>EvalShield's <strong>Shadow Traffic Splitter</strong> forks incoming production traffic asynchronously in the background. The production model serves the user immediately with <strong>0ms overhead</strong>, while the candidate runs in an isolated sandbox.</p>
+    <p>EvalShield resolves this fundamental engineering barrier through a dedicated <strong>Asynchronous Shadow Traffic Splitter</strong> coupled with <strong>State-Virtualizing Tool Sandboxes</strong>.</p>
 
-    <p>The <strong>Shadow Diff Engine</strong> analyzes the trajectory deltas using:</p>
+    <div class="callout-box">
+      <h4>⚡ Eliminating the "Canary Dilemma" with 0ms Added Overhead</h4>
+      <p>Standard canary deployments expose a small fraction of real users (e.g. 5%) to candidate agents. If the candidate agent hallucinates or enters a loop, real customers suffer. With EvalShield's Shadow Splitter, <strong>0% of users are exposed</strong>, yet candidate models are battle-tested against 100% genuine, chaotic production inputs.</p>
+    </div>
+
+    <h3>A. Decoupled Asynchronous Execution Mechanics</h3>
+    <p>When an incoming user request arrives, the production agent serves the response synchronously in the main execution thread. The Shadow Splitter forks the execution payload into an isolated background worker pool (<code>asyncio.create_task</code> or thread worker), returning the HTTP 200 response to the end-user immediately with <strong>0ms added latency</strong>.</p>
+
+    <pre><code>// High-Level Logic: Asynchronous Shadow Splitter &amp; Sandboxed Execution
+FUNCTION ProcessRequest(user_prompt, context):
+    // 1. Asynchronously fork traffic to candidate agent in background worker
+    IF RandomSample() &lt; SampleRate THEN:
+        BackgroundWorker.DispatchAsync(() =&gt; {
+            sandboxed_tools = ToolMockGateway.Virtualize(CandidateTools)
+            candidate_graph = CandidateAgent.Execute(user_prompt, sandboxed_tools)
+            ShadowDiffEngine.CompareAndRecord(production_graph, candidate_graph)
+        })
+    END IF
+
+    // 2. Execute production agent synchronously and serve user immediately
+    production_response, production_graph = ProductionAgent.Execute(user_prompt)
+    RETURN production_response
+END FUNCTION</code></pre>
+
+    <h3>B. Two-Dimensional Sandbox Isolation</h3>
+    <p>How does EvalShield prevent the candidate agent from triggering side-effects while still testing its real-world decision logic? Isolation is enforced across two distinct planes:</p>
+
     <ul style="margin-left: 1.5rem; margin-bottom: 1.5rem; color: #cbd5e1;">
-      <li style="margin-bottom: 0.5rem;"><strong>Ordered Tool Levenshtein Alignment:</strong> Detects if Candidate swapped safe DB lookups for destructive update APIs.</li>
-      <li style="margin-bottom: 0.5rem;"><strong>Semantic Cosine Convergence:</strong> Verifies final output similarity against baseline truth.</li>
-      <li style="margin-bottom: 0.5rem;"><strong>Step & Cost Inflation:</strong> Alerts if Candidate took 8 steps where Production took 2.</li>
+      <li style="margin-bottom: 0.75rem;"><strong>1. Tool Virtualization Gateway (<code>ToolMockGateway</code>):</strong> The candidate agent's tool registry is dynamically virtualized. Read-only tools (e.g., knowledge base searches, catalog queries) safely hit read replicas. State-mutating tools (e.g., <code>charge_credit_card</code>, <code>delete_db_record</code>, <code>trigger_webhook</code>) are intercepted by the gateway, which records the exact intended arguments and returns realistic synthetic mocks without touching live external APIs.</li>
+      <li style="margin-bottom: 0.75rem;"><strong>2. Context-Isolated Execution Hermeticity:</strong> In high-concurrency environments, multi-threaded loggers frequently suffer from cross-talk. EvalShield binds each execution to an isolated <code>contextvars.ContextVar</code> context, ensuring Candidate v2's step recording never contaminates Production v1's memory graph.</li>
     </ul>
+
+    <h3>C. The Trajectory Diff Engine</h3>
+    <p>Once both executions complete, the <strong>Shadow Diff Engine</strong> compares their complete execution graphs across three analytical dimensions:</p>
+
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th>Diff Dimension</th>
+          <th>Underlying Algorithm</th>
+          <th>What It Detects Before Production Release</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Ordered Tool Sequence Alignment</strong></td>
+          <td>Levenshtein &amp; Jaccard Distance over tool call sequences</td>
+          <td>Flags if candidate swapped a safe DB lookup for an unapproved API or re-ordered critical verification steps.</td>
+        </tr>
+        <tr>
+          <td><strong>Step &amp; Token Cost Inflation</strong></td>
+          <td>Trajectory DAG node count &amp; token delta tracking</td>
+          <td>Catches silent micro-cycles (e.g. Candidate took 14 steps and 60,000 tokens where Production took 2 steps).</td>
+        </tr>
+        <tr>
+          <td><strong>Semantic Output Convergence</strong></td>
+          <td>Calibrated embedding &amp; LLM judge cosine similarity</td>
+          <td>Flags when candidate generates contradictory, unaligned, or policy-violating final responses.</td>
+        </tr>
+      </tbody>
+    </table>
 
     <h2>5. Automated Adversarial Red-Teaming Matrix</h2>
     <p>Before any agent is promoted to production, EvalShield runs a synthetic red-team battery against 5 adversarial attack vectors:</p>
