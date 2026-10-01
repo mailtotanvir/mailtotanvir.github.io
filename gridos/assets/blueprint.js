@@ -60,4 +60,3 @@
       var sections=root.querySelectorAll('section[data-nav]');
       if('IntersectionObserver' in window){var observer=new IntersectionObserver(function(entries){entries.forEach(function(entry){if(entry.isIntersecting){links.forEach(function(a){a.classList.toggle('active',a.getAttribute('href')==='#'+entry.target.id)});}});},{rootMargin:'-20% 0px -70% 0px'});sections.forEach(function(s){observer.observe(s)});}
     })();
-  
