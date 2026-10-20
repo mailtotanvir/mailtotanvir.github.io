@@ -1,0 +1,196 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="An expense-agent investigation becomes a local evidence workbench: capture contracts, cryptographic verification, replay, and explicit enterprise trust boundaries."><meta name="author" content="Cinderlog contributors"><title>The Agent Ran Successfully. Can You Prove What Happened? · Cinderlog · Cinderlog contributors</title><link rel="stylesheet" href="assets/article.css"></head><body><a class="skip" href="#the-ordinary-request">Skip to article</a><div class="progress" aria-hidden="true"></div><div class="layout"><aside class="toc"><span class="kicker">On this page</span><nav aria-label="Article contents"><a href="#the-ordinary-request">The ordinary request</a><a href="#the-investigation-changes-the-question">The investigation changes the question</a><a href="#an-architecture-with-three-boundaries">An architecture with three boundaries</a><a href="#what-enters-the-record">What enters the record</a><a href="#the-byte-contract-is-the-product">The byte contract is the product</a><a href="#one-sentence-breaks-the-retained-chain">One sentence breaks the retained chain</a><a href="#the-workbench-keeps-the-contradiction-visible">The workbench keeps the contradiction visible</a><a href="#three-kinds-of-replay-three-kinds-of-claim">Three kinds of replay, three kinds of claim</a><a href="#what-an-enterprise-reviewer-can-rely-on">What an enterprise reviewer can rely on</a><a href="#what-the-implementation-actually-proved">What the implementation actually proved</a><a href="#reproduce-the-investigation">Reproduce the investigation</a><a href="#return-to-the-expense-request">Return to the expense request</a><a href="#source-and-publication-status">Source and publication status</a></nav><a class="back" href="../">← All publications</a></aside><main><header class="hero"><a class="author" href="../">Cinderlog contributors</a><p class="kicker">Agent evidence / engineering investigation</p><h1>The agent ran successfully.<br><em>Can you prove what happened?</em></h1><p class="deck">A reimbursement loop, an altered record, and the engineering contract between what an agent did and what a reviewer can verify.</p><div class="meta"><span>October 19, 2026</span><span>15-minute deep dive</span><span>Locally implemented v0.1</span></div><div class="hero-links"><a href="#architecture-visual">Explore the architecture ↓</a><a href="#tamper-visual">Watch the evidence break ↓</a></div></header><aside class="brief"><span class="kicker">The investigation</span><p>A completed run can leave invalid evidence. Cinderlog keeps capture, chain integrity, signature validity, and key trust separate—then reconstructs the observations without executing the tools again.</p></aside><section class="chapter" id="the-ordinary-request"><span class="kicker">01 / Cinderlog</span><h2>The ordinary request</h2><div class="prose">
+<p>The request is small enough to disappear into a normal workday: “What is the status of expense EXP-1042?” An assistant looks up the record and answers that the reimbursement is pending. The user gets an answer. The run finishes successfully. A green completion marker seems reasonable.</p>
+<p>Now follow the execution rather than the answer. The assistant asked <code>get_expense_status</code> for the same expense three times. Each request produced the same fictional pending record. Nothing in the final sentence explains why the calls repeated. For an engineer, the interesting question is no longer whether the assistant answered. It is what the execution actually did, and which parts of that account can be checked later.</p>
+<p>This is the incident I used to build Cinderlog. It is a deterministic fixture, not a recording of an actual employee or financial system. No reimbursement is paid, no HR service is contacted, and no model API is required. Keeping the incident fictional makes it possible to alter its evidence deliberately and test the investigator’s tools without exposing customer data.</p>
+<p>The first result is deliberately uncomfortable: a completed run with a loop warning. The second is more revealing: another record still says completed, but its captured user input has been changed. A dashboard that shows only the outcome would tell the same story about both. An evidence workbench should not.</p>
+<blockquote>
+<p>The run outcome describes how execution ended. The evidence verdict describes whether the retained record satisfies a verification policy. Neither one can stand in for the other.</p>
+</blockquote>
+</div></section><section class="chapter" id="the-investigation-changes-the-question"><span class="kicker">02 / Cinderlog</span><h2>The investigation changes the question</h2><div class="prose">
+<p>Imagine a runtime engineer handing the run to an incident reviewer. The engineer wants to know whether the repeated requests came from the agent or an adapter. The reviewer wants to establish that the file has not changed since the retained seal. A privacy owner wants to know what the file contains before it is shared. Those are different questions, with different proof obligations.</p>
+<p>An ordinary trace can be excellent for performance analysis and still be insufficient as an independently checkable artifact. A log line may omit tool arguments. A dashboard may derive its summary from editable database fields. Export might preserve display text while losing ordering or producer identity. A cryptographic signature may verify under a key that arrived in the same file, without establishing who controlled that key.</p>
+<p>Cinderlog’s job is to make these distinctions inspectable. It records a bounded session as typed, ordered events; retains a chain commitment and a run seal; verifies a portable bundle without instantiating the recorder; and reconstructs the observed sequence without executing tools. Analysis and presentation come after that evidence contract.</p>
+<p>The design is local-first because the first proof should survive losing the dashboard. An engineer can run the verifier on JSON in another local environment. SQLite is convenient storage, but the portable bundle is the review artifact. The browser is useful presentation, but it is not the authority for authenticity.</p>
+</div></section><section class="chapter" id="an-architecture-with-three-boundaries"><span class="kicker">03 / Cinderlog</span><h2>An architecture with three boundaries</h2><div class="prose">
+<p>The architecture separates capture, local persistence, and independent review. These are responsibility boundaries in a small Python application, not a proposal for nine deployed services. Keeping them explicit makes it possible to ask what each component can promise and how it can fail.</p>
+<p>The capture adapter submits observations. The recorder assigns event IDs, capture time, sequence, and producer labels. The capture policy removes selected values before persistence. Typed validation and canonical serialization define the bytes that enter the chain. This boundary does not prove source truth: a compromised source can still submit a fabricated observation.</p>
+<p>The persistence boundary owns ordering and finalization. SQLite transactions allocate one sequence per run. Finalization adds the terminal event and commits finalized metadata, the seal, and optional signature together. Private key custody sits beside that process rather than inside the evidence database. The append-only application API rejects later appends; a process with file access can still modify SQLite directly.</p>
+<p>The review boundary treats both database contents and exported bundles as evidence to check. It recomputes digests, validates sequence and lifecycle, checks the seal, validates a signature, and enforces a supplied trust fingerprint. Reconstruction, deterministic findings, and a static report consume those results. They cannot turn a successful execution status into a valid evidence verdict.</p>
+<section class="visual" id="architecture-visual" aria-label="Interactive Cinderlog architecture"><div class="visual-head"><div><span class="kicker">Architecture / three responsibility boundaries</span><h3>Follow the observation. Keep the trust boundary.</h3><p>Select a component to inspect its contract and failure posture.</p></div><button id="flow-toggle" aria-pressed="true">Pause flow</button></div><div class="diagram"><div class="lanes">
+<div class="lane"><p>01 · Capture boundary</p><button class="node selected" data-node="adapter" aria-pressed="true"><b>Observed agent activity</b><span>Fixture / future adapter seam</span></button><div class="arrow"><i class="packet"></i></div><button class="node" data-node="policy" aria-pressed="false"><b>Capture policy</b><span>Redact → validate → audit</span></button><div class="arrow"><i class="packet"></i></div><button class="node" data-node="chain" aria-pressed="false"><b>Canonical event chain</b><span>Typed JSON + SHA-256</span></button></div>
+<div class="lane"><p>02 · Local evidence boundary</p><button class="node" data-node="store" aria-pressed="false"><b>Transactional SQLite</b><span>Sequence authority / append API</span></button><div class="arrow"><i class="packet"></i></div><button class="node" data-node="seal" aria-pressed="false"><b>Run seal + Ed25519</b><span>Separate private-key custody</span></button><div class="arrow"><i class="packet"></i></div><button class="node" data-node="bundle" aria-pressed="false"><b>Portable bundle</b><span>One run / bounded JSON</span></button></div>
+<div class="lane"><p>03 · Independent review boundary</p><button class="node" data-node="verify" aria-pressed="false"><b>Independent verifier</b><span>Recompute / compare / pin key</span></button><div class="arrow"><i class="packet"></i></div><button class="node" data-node="replay" aria-pressed="false"><b>Reconstruction + analysis</b><span>Facts / findings / derived simulation</span></button><div class="arrow"><i class="packet"></i></div><button class="node" data-node="report" aria-pressed="false"><b>Offline report + CLI</b><span>Presentation consumes fresh verdicts</span></button></div></div></div><div class="detail" id="node-detail" aria-live="polite"><strong>Capture boundary · </strong>Instrumentation records observations. It cannot establish that an unobserved action did not happen or that a compromised source told the truth.</div><div class="boundary">FLOW: capture → local commit → portable review. Key pin: independently supplied to verifier. Dashed lanes describe logical boundaries, not deployed services. Moving pulses illustrate flow; they are not live telemetry.</div></section>
+<p>This arrangement has a practical benefit: the verifier does not need to trust the recorder’s control flow. The two share the documented byte contract, but recording and verification are independently orchestrated. Golden vectors matter because agreement between two components can hide a shared serialization mistake.</p>
+</div></section><section class="chapter" id="what-enters-the-record"><span class="kicker">04 / Cinderlog</span><h2>What enters the record</h2><div class="prose">
+<p>A run begins at sequence zero with <code>run_started</code>. Every event contains an ID, run ID, sequence, UTC capture timestamp, event type, producer, typed payload, previous hash, and its own digest. Optional correlation and parent/span identifiers provide an extension seam without introducing a full tracing platform.</p>
+<p>The expense fixture records the input, a model-request fixture message, three tool requests and results, a warning, a model-response fixture message, and a terminal event. Those model messages are deterministic fixture content. They are not hidden model reasoning or evidence that a live model made this decision.</p>
+<p>Payloads retain their capture mode and redaction audits. The default request includes a fictional credential field. Before the event reaches SQLite, the value becomes <code>[REDACTED]</code>; a rule identifier and JSON path remain. The record can establish that this field was filtered without retaining the removed value in an operational log.</p>
+<p>That choice affects analysis. Two different raw credentials become the same captured marker. If a detector compares captured arguments, it can see an apparent repeated request even when an omitted value differed. Cinderlog qualifies the comparison. Metadata-only capture is more restrictive: content is absent by policy, so no reconstruction should invent it.</p>
+<h3>Why redaction happens before hashing</h3>
+<p>Filtering before hashing gives the signature a precise meaning: it commits to the captured, policy-filtered record. It does not commit to recoverable raw payloads hidden somewhere else. That reduces secret retention and simplifies portable review, but also means the reviewer cannot reconstruct removed content.</p>
+<p>Imported evidence creates another boundary. The report applies additional display filtering without changing the source bytes used by verification. Export preserves the original signed evidence. Silently redacting an export and preserving the original signature would create a false assurance claim; a changed artifact would need its own seal and clear provenance.</p>
+</div></section><section class="chapter" id="the-byte-contract-is-the-product"><span class="kicker">05 / Cinderlog</span><h2>The byte contract is the product</h2><div class="prose">
+<p>The central engineering decision is not the dashboard layout. It is the exact serialization contract another implementation would have to reproduce. Cinderlog v1 uses UTF-8, lexicographically sorted object keys, compact separators, unchanged Unicode strings, and strict supported JSON values. Integers fit signed 64-bit range. Floats are rejected; monetary amounts use decimal strings.</p>
+<p>The restriction is intentional. General JSON permits values whose representation varies across languages and runtimes. Floating-point normalization, negative zero, and exponent formatting deserve a complete interoperability contract. The small first version avoids claiming RFC 8785 compliance it does not implement. It also rejects duplicate object keys rather than allowing parser-specific interpretations.</p>
+<pre><code class="language-python">body = {key: value for key, value in event.items() if key != &quot;event_hash&quot;}
+event_hash = sha256(b&quot;cinderlog:event:v1:&quot; + canonical(body)).hexdigest()
+</code></pre>
+<p>The previous hash appears inside that canonical object exactly once. Genesis is 32 zero bytes. A fixed domain separator distinguishes event hashing from other digest uses. The event cannot include its own digest in the bytes being hashed. The format document and golden vectors specify the actual behavior rather than saying merely “serialize consistently.”</p>
+<p>At finalization, the seal commits to run ID, schema, count, final hash, outcome, sealing timestamp, and a digest of finalized run metadata. Ed25519 signs a separately domain-prefixed canonical seal. The metadata digest prevents an editable display name or agent version from floating outside the signed commitment.</p>
+<h3>Ordering is a transaction concern</h3>
+<p>A hash chain does not solve concurrent sequence allocation. SQLite’s <code>BEGIN IMMEDIATE</code> serializes mutations for a run before the next event is assembled and appended. Event IDs and <code>(run_id, sequence)</code> are unique. A failed validation rolls back the transaction. Tests exercise concurrent appends and a rejected append that leaves the original record unchanged.</p>
+<p>The final terminal event, metadata, seal, and signature are committed atomically. Public interfaces reject events after finalization. A hard crash remains different from graceful interruption: it can leave an unfinished, unsealed run. Cinderlog can show that incomplete record, but final verification must not label it complete or invent a terminal event that was never observed.</p>
+</div></section><section class="chapter" id="one-sentence-breaks-the-retained-chain"><span class="kicker">06 / Cinderlog</span><h2>One sentence breaks the retained chain</h2><div class="prose">
+<p>The adversarial demo edits a copy of the exported run. At sequence 1, the original reimbursement request becomes an altered request. The stored event hash is not regenerated. The subsequent links still refer to the old commitment. The run outcome remains completed, and the original seal and signature remain in the file.</p>
+<p>This is where the separate checks earn their place. Recomputing the modified event detects the first invalid sequence. Comparing the resulting chain with the retained seal fails. Verifying the seal’s signature can still succeed because the seal bytes themselves did not change. A signature check in isolation would therefore miss the relationship that failed.</p>
+<section class="visual" id="tamper-visual" aria-label="Animated evidence tampering scenario"><div class="visual-head"><div><span class="kicker">Illustrative scenario / based on the executed fixture</span><h3>One altered sentence. Two different verdicts.</h3><p>A 36-second explanation of capture, sealing, alteration, and independent verification.</p></div><span class="chip" id="scene-time">00 / 36s</span></div><div class="film-stage"><div class="chain" aria-label="Illustrative event chain"><div class="chain-event"><b>00 · Start</b><small>recorder context</small></div><span class="chain-arrow">→</span><div class="chain-event"><b>01 · Input</b><small>user request</small></div><span class="chain-arrow">→</span><div class="chain-event"><b>03 · Tool</b><small>captured call</small></div><span class="chain-arrow">→</span><div class="chain-event"><b>11 · Terminal</b><small>run completed</small></div></div><p class="scope-note">Selected events only. Arrows stand for the chain of intervening events; sequence 01 is the actual tamper target.</p><div class="verdicts"><div class="verdict"><span>Run outcome</span><b class="green">completed</b></div><div class="verdict"><span>Evidence integrity</span><b class="green" id="film-integrity">valid</b></div><div class="verdict"><span>Signature / identity</span><b id="film-signature">not sealed yet</b></div></div></div><div class="film-caption" aria-live="polite"><span class="kicker" id="scene-label">01 / OBSERVE</span><h3 id="scene-title">The run completed. The calls repeated.</h3><p id="scene-copy">A successful run outcome is independent of evidence integrity.</p></div><div class="film-controls"><button id="scene-play" aria-pressed="false">Play scenario</button><label for="scene-scrub" class="eyebrow">Scene</label><input id="scene-scrub" type="range" min="0" max="36" value="0" step="0.1" aria-label="Scenario position in seconds"></div><div class="steps"><button data-scene="0" aria-pressed="true">01 Observe</button><button data-scene="1" aria-pressed="false">02 Seal</button><button data-scene="2" aria-pressed="false">03 Alter</button><button data-scene="3" aria-pressed="false">04 Recompute</button><button data-scene="4" aria-pressed="false">05 Trust</button><button data-scene="5" aria-pressed="false">06 Reconstruct</button></div><noscript><p class="detail">JavaScript is disabled. Read the accompanying article for the full static scenario: the altered input fails chain verification at sequence 1 while the run outcome stays completed.</p></noscript></section>
+<p>The animation explains the actual fixture’s mechanism; it is not a live recording or telemetry feed. It intentionally shows signature validity separately from chain and seal integrity. The static article remains the technical account when animation is paused, reduced motion is enabled, or JavaScript is unavailable.</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Original demo</th>
+<th>Altered copy</th>
+<th>What the result establishes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Run outcome</td>
+<td>completed</td>
+<td>completed</td>
+<td>Recorded terminal outcome</td>
+</tr>
+<tr>
+<td>Sequence continuity</td>
+<td>valid</td>
+<td>valid</td>
+<td>No sequence was removed in this particular edit</td>
+</tr>
+<tr>
+<td>Hash chain</td>
+<td>valid</td>
+<td>invalid</td>
+<td>Captured bytes no longer match retained links</td>
+</tr>
+<tr>
+<td>Seal integrity</td>
+<td>valid</td>
+<td>invalid</td>
+<td>The recomputed record no longer matches its seal</td>
+</tr>
+<tr>
+<td>Signature validity</td>
+<td>valid</td>
+<td>valid</td>
+<td>Unchanged seal bytes verify under the bundled key</td>
+</tr>
+<tr>
+<td>Key trust</td>
+<td>untrusted</td>
+<td>untrusted</td>
+<td>The demo provides no independent identity reference</td>
+</tr>
+<tr>
+<td>Overall / exit</td>
+<td>valid / 0</td>
+<td>invalid / 1</td>
+<td>Result under the selected structural policy</td>
+</tr>
+</tbody>
+</table>
+<p>The original is verified again after the copy is altered and still passes. That last check is small but useful: the demonstration must not mutate its source while constructing the failure case. The acceptance script asserts concrete exit codes and the first invalid sequence, rather than merely checking that commands returned without exceptions.</p>
+</div></section><section class="chapter" id="the-workbench-keeps-the-contradiction-visible"><span class="kicker">07 / Cinderlog</span><h2>The workbench keeps the contradiction visible</h2><div class="prose">
+<p>A useful investigation surface should show the apparent contradiction immediately: RUN STATUS is completed while EVIDENCE INTEGRITY is invalid. Signature and key trust are also visible, alongside a timeline, payload expansion, findings, and references back to the affected events.</p>
+<figure class="shot"><img loading="lazy" src="assets/report-desktop.png" alt="Original report: completed run, valid evidence, and untrusted bundled key."><figcaption>Original report: completed run, valid evidence, and untrusted bundled key.</figcaption></figure>
+<p>The original report exposes the captured redaction policy and the possible loop. A reviewer can follow the repeated calls in sequence and inspect their captured argument/result envelopes. The UI does not claim that it knows why a live model chose those calls. It shows the recorded messages and observations available in the fixture.</p>
+<figure class="shot"><img loading="lazy" src="assets/report-tampered.png" alt="Altered copy: completed run, invalid evidence, first invalid sequence 1."><figcaption>Altered copy: completed run, invalid evidence, first invalid sequence 1.</figcaption></figure>
+<p>The altered report preserves the run outcome while displaying the invalid verdict and first invalid event. This is a deliberate presentation requirement: damaged evidence remains inspectable, but it must not become a success-looking artifact simply because its terminal event says completed.</p>
+<figure class="shot"><img loading="lazy" src="assets/report-mobile.png" alt="Actual report at a 390-pixel mobile viewport."><figcaption>Actual report at a 390-pixel mobile viewport.</figcaption></figure>
+<p>The report uses local CSS, native expandable event controls, no scripts or remote assets, and escaped untrusted payloads. Article animations are a separate publication layer; they do not add executable content to the evidence report. Mobile and keyboard review are part of the publication workflow, alongside tests that malicious payloads do not become HTML or scripts.</p>
+</div></section><section class="chapter" id="three-kinds-of-replay-three-kinds-of-claim"><span class="kicker">08 / Cinderlog</span><h2>Three kinds of replay, three kinds of claim</h2><div class="prose">
+<p>As-is reconstruction displays recorded facts. It does not contact the tool adapter, execute a payment, or ask a model to generate another answer. The evidence can be incomplete, and reconstruction must inherit that limitation. Preserving the order does not recover uncaptured context.</p>
+<p>Diff compares event type, producer, captured payload, and terminal outcome. IDs and capture timestamps are reported separately as envelope differences so two otherwise equivalent fixture records do not look behaviorally different merely because their run IDs changed. Redacted inputs also constrain what a semantic comparison can establish.</p>
+<p>The v0.1 simulation is deliberately small: apply a deterministic maximum-call budget to a copy of the recorded calls. A three-call fixture under a one-call budget yields a derived cancelled outcome and references the later calls. This is an explanation of a policy rule, not proof that the historical model would have stopped after its first request. There is no model-generation reproduction, external write, or source-record mutation.</p>
+<p>These distinctions prevent a familiar debugging error: presenting a plausible rerun as the historical execution. A simulated outcome can help formulate a fix. A retained record helps establish what was observed. They answer related questions, but their provenance is different.</p>
+</div></section><section class="chapter" id="what-an-enterprise-reviewer-can-rely-on"><span class="kicker">09 / Cinderlog</span><h2>What an enterprise reviewer can rely on</h2><div class="prose">
+<p>Enterprise relevance comes from explicit proof obligations, not from making a local prototype sound certified. A platform team can use the current version to investigate fictional or safely instrumented local runs and to exercise a portable evidence contract. Production adoption would need source-specific instrumentation, data handling, protected key custody, retention, and operational ownership.</p>
+<table>
+<thead>
+<tr>
+<th>Claim</th>
+<th>Implemented mechanism</th>
+<th>Local proof</th>
+<th>Remaining boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Detect retained-event alteration</td>
+<td>Recompute chain and compare seal</td>
+<td>Edit/delete/reorder/truncate tests</td>
+<td>A compromised capture source can lie</td>
+</tr>
+<tr>
+<td>Preserve ordered appends</td>
+<td>Serialized SQLite mutations and uniqueness</td>
+<td>Concurrent-append and rollback tests</td>
+<td>File-level attackers can edit SQLite</td>
+</tr>
+<tr>
+<td>Enforce chosen trust reference</td>
+<td>Signature check plus independent fingerprint</td>
+<td>Substitution and wrong-pin tests</td>
+<td>Key ownership/custody needs external controls</td>
+</tr>
+<tr>
+<td>Minimize obvious credentials</td>
+<td>Pre-persistence patterns and deny paths</td>
+<td>Canary absent from DB/export/terminal/HTML</td>
+<td>Custom/encoded secrets can evade patterns</td>
+</tr>
+<tr>
+<td>Reconstruct without side effects</td>
+<td>Data-only replay and offline fixture simulation</td>
+<td>Socket-blocked execution and immutability checks</td>
+<td>Future adapters must preserve the invariant</td>
+</tr>
+<tr>
+<td>Safe portable input/display</td>
+<td>Strict versions, bounds, escaped report</td>
+<td>Malformed/oversized and injection tests</td>
+<td>Limits need tuning for larger workloads</td>
+</tr>
+</tbody>
+</table>
+<p>There are several ways a stronger attacker can exceed this envelope. Stealing the private key permits new forged seals. Replacing an unsigned record and regenerating its hashes defeats structural authenticity claims. Replacing a bundle and its bundled public key produces a self-consistent story without an independently pinned identity. Changing local time can influence capture timestamps. Uninstrumented tool actions leave no record to verify.</p>
+<p>Independent anchoring could constrain later rewriting relative to a retained external checkpoint. It would not establish source truth. Hardware-backed key custody could reduce exposure of signing material. It would not make incomplete instrumentation complete. Those controls are complementary and need owners, failure procedures, and tested contracts of their own.</p>
+</div></section><section class="chapter" id="what-the-implementation-actually-proved"><span class="kicker">10 / Cinderlog</span><h2>What the implementation actually proved</h2><div class="prose">
+<p>The final local suite passed 30 tests. It covers golden serialization bytes, unsupported values, event tampering, deletion, reordering, duplicate sequences, truncation, metadata and seal changes, invalid signatures, substituted keys, independently pinned trust, deterministic fixtures, concurrent appends, rollback, lifecycle rejection, CLI exit codes, findings, diff, simulation, HTML injection, malformed/oversized inputs, redaction, and key permissions.</p>
+<p>The demo is also exercised with socket creation blocked. The secret canary is checked across persisted/exported artifacts, terminal output, and HTML. A fresh wheel installation generated the report successfully, which checks that package data and the installed CLI work beyond an editable checkout.</p>
+<p>Local Ruff lint and formatting, strict mypy checks, package build, locked offline dependency sync, and the end-to-end acceptance script passed. The repository contains a GitHub Actions workflow, but there has been no hosted CI run because nothing has been pushed. There is no independent audit, production certification, or claimed performance benchmark.</p>
+<p>Browser screenshot capture is an additional proof step. The sandbox used to implement this version blocks Chromium socket operations. The capture script is prepared to run in a browser-capable environment; until it has actually produced images, the publication must mark screenshot slots as pending instead of inserting fabricated UI illustrations.</p>
+</div></section><section class="chapter" id="reproduce-the-investigation"><span class="kicker">11 / Cinderlog</span><h2>Reproduce the investigation</h2><div class="prose">
+<p>Dependency installation may use the network. The recorded demo, verification, replay, and report generation require no credentials, GPU, or network access once installed.</p>
+<pre><code class="language-bash">uv sync --all-groups --locked
+uv run cinderlog demo --output review/demo
+uv run cinderlog verify review/demo/run.cinderlog.json --json
+uv run cinderlog verify review/demo/tampered.cinderlog.json --json
+# Original exits 0. Altered copy exits 1 at sequence 1.
+uv run cinderlog replay review/demo/run.cinderlog.json --json
+uv run cinderlog simulate review/demo/run.cinderlog.json --max-calls 1
+bash scripts/e2e_acceptance.sh
+</code></pre>
+<p>For independent key trust, create an Ed25519 pair explicitly, record with <code>--key</code>, and pass the fingerprint to verification through an independent channel. The default demo’s ephemeral key supplies a working signature exercise, not identity assurance.</p>
+<pre><code class="language-bash">uv run cinderlog keygen --output /tmp/cinderlog-keys/private.pem
+uv run cinderlog record-demo --key /tmp/cinderlog-keys/private.pem
+uv run cinderlog verify RUN_ID --policy trusted --trusted-fingerprint FINGERPRINT
+</code></pre>
+<p>Open the original and altered HTML reports side by side. Expand the user input and tool payloads. Follow the findings to their event references. Confirm that the original’s valid signature still has untrusted identity unless a pin is supplied. This review is about reading the mechanism and its limits, not merely admiring a green badge.</p>
+</div></section><section class="chapter" id="return-to-the-expense-request"><span class="kicker">12 / Cinderlog</span><h2>Return to the expense request</h2><div class="prose">
+<p>The employee still sees a pending reimbursement. Cinderlog does not change that result or enforce a tool-call budget on a real agent. What changes is the engineer’s ability to inspect the execution: three captured requests, policy-filtered arguments, a retained seal, and a verifier that can reject an altered copy without consulting the dashboard.</p>
+<p>That is the useful first increment. Next comes source mapping for OpenTelemetry, an MCP observation adapter, and a crash journal that preserves incomplete history honestly. External anchors and a team collector would follow after the local evidence contract has earned reuse. Optional generated interpretation would cite event references and stay separate from deterministic verification.</p>
+<p>The workbench is small by design. Its credibility comes from saying exactly what was retained, what was recomputed, which key was trusted, and where reconstruction stops. A completed run can be a starting point for investigation. It should not be the end of the evidence story.</p>
+</div></section><section class="chapter" id="source-and-publication-status"><span class="kicker">13 / Cinderlog</span><h2>Source and publication status</h2><div class="prose">
+<p>The implementation, <a href="assets/FORMAT.md">format</a>, <a href="assets/THREAT_MODEL.md">threat model</a>, and <a href="assets/LICENSE">MIT license</a> are available in the local Cinderlog checkout. The intended remote repository is <code>https://github.com/mailtotanvir/Cinderlog</code>; remote creation/availability and public CI are not asserted here. Application push and blog publication remain pending owner review.</p>
+<p>The reading layout and interactive explanation approach were informed by the owner’s <a href="https://mailtotanvir.github.io/gridos/">gridOS article</a> and the requested enterprise portfolio reference. The local gridOS source was inspected; live reference retrieval was unavailable in this sandbox. These are design references, not evidence that Cinderlog implements gridOS or has enterprise certification.</p></div></section><footer><a href="../">← Tanvir’s publications</a><span>© 2026 Cinderlog contributors</span></footer></main></div><script src="assets/article.js" defer></script></body></html>
