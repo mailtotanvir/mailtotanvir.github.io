@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What Should an AI Agent Earn for Shipping Code? | Tanvir</title>
+    <meta name="description" content="Building Agora: a multi-agent coding runtime with measured test progress, token budgets, dynamic allocation, and replayable evidence. Includes deterministic and live-model results.">
+    <!-- Premium Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg-base: #090e13;
+            --bg-gradient: radial-gradient(ellipse at 75% 0%, #1c334477, transparent 760px),
+                           radial-gradient(ellipse at 0% 45%, #28302438, transparent 650px);
+            --glass-card: #101a23;
+            --border-glass: #273746;
+            --text-primary: #e8eef4;
+            --text-secondary: #b8c8d5;
+            --text-muted: #9fb1bf;
+            --accent-gold: #e8ad79;
+            --accent-gold-dark: #f4c59d;
+            --accent-blue: #7cd8de;
+            --accent-green: #98d4ac;
+            --accent-red: #ff9696;
+            --badge-bg: #473321;
+            --badge-border: #865c3f;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-base);
+            background-image: var(--bg-gradient);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            min-height: 100vh;
+            line-height: 1.75;
+        }
+
+        .container { max-width: 860px; margin: 0 auto; padding: 75px 24px 120px; }
+
+        .back-link {
+            display: inline-flex; align-items: center; gap: 8px;
+            color: var(--text-secondary); text-decoration: none;
+            font-weight: 600; font-size: 0.95rem; margin-bottom: 36px;
+            transition: all 0.2s ease;
+        }
+        .back-link:hover { color: var(--accent-gold); transform: translateX(-2px); }
+
+        article {
+            background: var(--glass-card);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--border-glass);
+            border-radius: 24px;
+            padding: 52px;
+            box-shadow: 0 25px 70px rgba(0, 0, 0, 0.28);
+        }
+
+        .post-meta {
+            display: flex; align-items: center; gap: 12px;
+            font-size: 0.85rem; color: var(--text-muted);
+            margin-bottom: 24px; flex-wrap: wrap;
+        }
+        .post-date { font-weight: 600; }
+        .post-category {
+            background-color: var(--badge-bg); color: var(--accent-gold-dark);
+            padding: 4px 12px; border-radius: 99px; font-size: 0.75rem;
+            font-weight: 700; border: 1px solid var(--badge-border);
+            text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .pill {
+            background-color: #172631; color: var(--text-secondary);
+            border: 1px solid #405364; padding: 3px 10px;
+            border-radius: 99px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+        }
+
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(2.2rem, 5vw, 3.2rem); font-weight: 800; letter-spacing: -0.04em;
+            line-height: 1.16; color: var(--text-primary); margin-bottom: 24px;
+        }
+        .subtitle {
+            font-size: 1.16rem; color: var(--text-secondary); line-height: 1.6;
+            margin-bottom: 40px; font-weight: 500;
+            border-bottom: 1px solid var(--border-glass); padding-bottom: 28px;
+        }
+
+        .kpi-row {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 12px; margin: 32px 0 44px;
+        }
+        .kpi-card {
+            background: #14222d; border: 1px solid var(--border-glass);
+            border-radius: 14px; padding: 18px 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+        .kpi-card:hover { transform: translateY(-2px); border-color: #658294; }
+        .kpi-card .val {
+            font-family: 'JetBrains Mono', monospace; font-size: 1.85rem;
+            font-weight: 800; color: var(--accent-gold); line-height: 1.1; margin-bottom: 6px;
+        }
+        .kpi-card .lbl {
+            font-size: 0.78rem; font-weight: 600; color: var(--text-muted); line-height: 1.35;
+        }
+
+        h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.55rem; font-weight: 700; color: var(--text-primary);
+            margin-top: 52px; margin-bottom: 18px; letter-spacing: -0.025em;
+        }
+        h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.2rem; font-weight: 700; color: var(--text-primary);
+            margin-top: 32px; margin-bottom: 14px; letter-spacing: -0.015em;
+        }
+        p { margin-bottom: 22px; color: var(--text-secondary); font-size: 1.04rem; }
+        strong { color: var(--text-primary); font-weight: 700; }
+
+        blockquote {
+            border-left: 4px solid var(--accent-gold);
+            padding: 18px 24px; margin: 32px 0;
+            font-size: 1.08rem; color: var(--text-primary);
+            background: #261f1c;
+            border-radius: 0 14px 14px 0;
+            font-style: italic; line-height: 1.65;
+        }
+
+        ul, ol { margin-left: 24px; margin-bottom: 24px; color: var(--text-secondary); }
+        li { margin-bottom: 10px; font-size: 1.02rem; }
+
+        .executive-takeaway {
+            background: linear-gradient(135deg, #17303c 0%, #18212c 100%);
+            color: #ffffff; border-radius: 18px; padding: 32px; margin: 40px 0;
+            box-shadow: 0 12px 32px rgba(30, 58, 138, 0.15);
+        }
+        .executive-takeaway h3 { color: var(--accent-gold); margin-top: 0; margin-bottom: 12px; }
+        .executive-takeaway p { color: var(--text-secondary); margin-bottom: 0; font-size: 1.02rem; }
+
+        .compare-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 32px 0;
+        }
+        .compare-box {
+            background: #14222d; border: 1px solid var(--border-glass);
+            border-radius: 14px; padding: 24px;
+        }
+        .compare-box.bad { border-top: 4px solid var(--accent-red); }
+        .compare-box.good { border-top: 4px solid var(--accent-green); }
+        .compare-box h4 {
+            font-family: 'Space Grotesk', sans-serif; font-size: 1.15rem;
+            margin-bottom: 12px; color: var(--text-primary);
+        }
+        .compare-box ul { margin-left: 18px; margin-bottom: 0; }
+        .compare-box li { font-size: 0.94rem; margin-bottom: 8px; }
+
+        /* Diagram Container */
+        .diagram-container {
+            margin: 36px 0; background: #0d1720; border: 1px solid var(--border-glass);
+            border-radius: 16px; padding: 26px; box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+            overflow-x: auto;
+        }
+        .diagram-title {
+            font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700;
+            color: var(--accent-gold-dark); text-transform: uppercase; letter-spacing: 0.08em;
+            margin-bottom: 20px; display: flex; align-items: center; gap: 8px;
+        }
+        .diagram-container > svg { display: block; height: auto; }
+        .diagram-container > svg rect[fill="#ffffff"] { fill: #172631; }
+        .diagram-container > svg rect[fill="#f8fafc"] { fill: #0d1720; stroke: #344b5b; }
+        .diagram-container > svg rect[fill="#fffbeb"] { fill: #33271d; }
+        .diagram-container > svg rect[fill="#ecfdf5"] { fill: #19322d; }
+        .diagram-container > svg rect[fill="#fff7ed"] { fill: #33271d; }
+        .diagram-container > svg rect[stroke="#1e3a8a"],
+        .diagram-container > svg rect[stroke="#3b82f6"] { stroke: #7cd8de; }
+        .diagram-container > svg rect[stroke="#047857"] { stroke: #98d4ac; }
+        .diagram-container > svg rect[stroke="#b45309"],
+        .diagram-container > svg rect[stroke="#d97706"] { stroke: #e8ad79; }
+        .diagram-container > svg path[stroke="#1e3a8a"],
+        .diagram-container > svg path[stroke="#3b82f6"] { stroke: #7cd8de; }
+        .diagram-container > svg path[stroke="#047857"] { stroke: #98d4ac; }
+        .diagram-container > svg path[stroke="#d97706"] { stroke: #e8ad79; }
+        .diagram-container > svg text[fill="#334155"] { fill: #c4d2dc; }
+        .diagram-container > svg text[fill="#1e3a8a"],
+        .diagram-container > svg text[fill="#3b82f6"] { fill: #7cd8de; }
+        .diagram-container > svg text[fill="#047857"],
+        .diagram-container > svg text[fill="#065f46"] { fill: #98d4ac; }
+        .diagram-container > svg text[fill="#b45309"],
+        .diagram-container > svg text[fill="#d97706"],
+        .diagram-container > svg text[fill="#92400e"],
+        .diagram-container > svg text[fill="#78350f"],
+        .diagram-container > svg text[fill="#9a3412"],
+        .diagram-container > svg text[fill="#7c2d12"] { fill: #e8ad79; }
+
+        .allocation-chart { margin: 30px 0 22px; padding: 28px; border: 1px solid #385163; border-radius: 18px; background: linear-gradient(145deg, #142632, #0c171f); }
+        .allocation-chart figcaption { margin-bottom: 20px; }
+        .chart-eyebrow { display: block; color: var(--accent-gold); font: 700 0.72rem 'JetBrains Mono', monospace; letter-spacing: .1em; text-transform: uppercase; }
+        .allocation-chart h3 { margin: 7px 0 5px; font-size: 1.35rem; }
+        .allocation-chart figcaption p { margin: 0; font-size: .89rem; }
+        .chart-legend { display: flex; flex-wrap: wrap; gap: 18px; margin: 0 0 23px; color: var(--text-secondary); font-size: .78rem; }
+        .chart-legend span { display: inline-flex; align-items: center; gap: 7px; }
+        .chart-swatch { width: 12px; height: 12px; border-radius: 3px; background: #647c8d; }
+        .chart-swatch.dynamic { background: var(--accent-gold); }
+        .chart-row { display: grid; grid-template-columns: 102px minmax(0,1fr) 95px; gap: 12px; align-items: center; padding: 11px 0; border-top: 1px solid #273746; }
+        .chart-role { color: var(--text-primary); font-size: .85rem; font-weight: 700; }
+        .chart-bars { display: grid; gap: 5px; }
+        .chart-bar { height: 13px; border-radius: 0 5px 5px 0; min-width: 3px; }
+        .chart-bar.fixed { width: 47.7%; background: #647c8d; }
+        .chart-bar.dynamic { background: linear-gradient(90deg, #b67344, #e8ad79); }
+        .chart-values { color: var(--text-secondary); font: 600 .72rem 'JetBrains Mono', monospace; text-align: right; white-space: nowrap; }
+        .chart-values strong { color: var(--accent-gold); }
+        .chart-takeaway { margin-top: 22px; padding: 14px 17px; border-left: 3px solid var(--accent-gold); background: #24302e; color: var(--text-primary); font-size: .9rem; }
+        .chart-note { margin: 14px 0 0; font-size: .76rem; color: var(--text-muted); }
+
+        .feature-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 32px 0;
+        }
+        .feature-card {
+            background: #14222d; border: 1px solid var(--border-glass); border-radius: 14px;
+            padding: 22px; transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+        .feature-card:hover { transform: translateY(-2px); border-color: var(--accent-gold); }
+        .feature-card h4 {
+            font-family: 'Space Grotesk', sans-serif; font-size: 1.1rem;
+            color: var(--text-primary); margin-bottom: 8px;
+        }
+        .feature-card p { font-size: 0.93rem; color: var(--text-secondary); margin-bottom: 0; }
+
+        table {
+            width: 100%; border-collapse: collapse; font-size: .94rem;
+            margin: 28px 0; border: 1px solid var(--border-glass); border-radius: 12px;
+            overflow: hidden; background: #14222d;
+        }
+        th, td {
+            border-bottom: 1px solid var(--border-glass); padding: 14px 14px;
+            text-align: left; vertical-align: middle;
+        }
+        th {
+            color: var(--text-muted); font-family: 'JetBrains Mono', monospace;
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.06em; background: #1b2b37;
+        }
+        tr:last-child td { border-bottom: none; }
+
+        .badge-tag {
+            display: inline-flex; align-items: center; padding: 3px 8px;
+            border-radius: 6px; font-size: 11px; font-family: 'JetBrains Mono', monospace;
+            font-weight: 700; text-transform: uppercase;
+        }
+        .badge-green { background: #1c3b32; color: #a8e2bd; }
+        .badge-gold { background: #453321; color: #f4c59d; }
+        .badge-blue { background: #1a3a48; color: #9be6e9; }
+
+        .button-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 40px; }
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 12px 22px; border-radius: 10px; font-weight: 700; font-size: 14px;
+            text-decoration: none; transition: all 0.2s ease; font-family: 'Space Grotesk', sans-serif;
+        }
+        .btn-primary {
+            background: var(--accent-gold); color: #17212a; border: 1px solid var(--accent-gold);
+            box-shadow: 0 4px 14px rgba(180, 83, 9, 0.2);
+        }
+        .btn-primary:hover { background: #f4c59d; transform: translateY(-1px); }
+        .btn-secondary {
+            background: #172631; color: var(--text-secondary); border: 1px solid #405364;
+        }
+        .btn-secondary:hover { border-color: #7b9baa; color: var(--text-primary); }
+
+        footer {
+            margin-top: 50px; padding-top: 28px; border-top: 1px solid var(--border-glass);
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.88rem; color: var(--text-muted);
+        }
+        footer a { color: var(--text-muted); text-decoration: none; }
+        footer a:hover { color: var(--accent-gold); }
+
+        @media (max-width: 820px) {
+            article { padding: 32px 24px; }
+            .kpi-row { grid-template-columns: 1fr 1fr; }
+            .compare-grid { grid-template-columns: 1fr; }
+            .feature-grid { grid-template-columns: 1fr; }
+            footer { flex-direction: column; gap: 16px; text-align: center; }
+        }
+        @media (max-width: 520px) {
+            .allocation-chart { padding: 18px; }
+            .chart-row { grid-template-columns: 72px minmax(0,1fr) 72px; gap: 7px; }
+            .chart-role, .chart-values { font-size: .68rem; }
+            .diagram-container { padding: 15px; }
+            table { display: block; overflow-x: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Tanvir’s Build Log</a>
+
+        <article>
+            <div class="post-meta">
+                <span class="post-category">Autonomous Agent Economics</span>
+                <span class="post-date">October 30, 2026</span>
+                <span class="pill">8 MIN READ</span>
+                <span class="pill">53 PASSING TESTS</span>
+            </div>
+
+            <h1>What Should an AI Agent Earn for Shipping Code?</h1>
+            <div class="subtitle">
+                I built Agora to ask a practical question: when a team of coding agents shares a limited inference budget, can verified software progress guide the next allocation?
+            </div>
+
+            <div class="kpi-row">
+                <div class="kpi-card">
+                    <div class="val">53</div>
+                    <div class="lbl">Passing runtime tests</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="val">18</div>
+                    <div class="lbl">Deterministic matrix cells</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="val">15.7%</div>
+                    <div class="lbl">Fewer tokens in one tight-budget comparison</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="val">2</div>
+                    <div class="lbl">Replayable golden runs</div>
+                </div>
+            </div>
+
+            <h2>A Budget Is Also a Coordination Mechanism</h2>
+            <p>A team of agents can spend tokens on planning, coding, review, and QA before it ships anything. A fixed allowance is simple, but it cannot respond when one role makes progress and another stalls. Agora tests whether a shared treasury can react to <strong>measured work</strong> while keeping a hard limit on total spend.</p>
+            <p>The runtime assigns a Product Manager, Architect, Coders, Reviewer, and QA agent to a real git workspace. Patches pass through review and pytest. The resulting test and ticket signals feed the budget for the next round.</p>
+
+            <div class="compare-grid">
+                <div class="compare-box bad">
+                    <h4>Fixed Allocation</h4>
+                    <ul>
+                        <li>Each role receives a preset share, regardless of its latest contribution.</li>
+                        <li>A tight global budget can leave productive work short of tokens.</li>
+                        <li>The allocation rule is easy to understand and serves as the experiment's baseline.</li>
+                    </ul>
+                </div>
+                <div class="compare-box good">
+                    <h4>Agora's Dynamic Allocation</h4>
+                    <ul>
+                        <li><strong>Measured progress:</strong> Pytest results, accepted tickets, and review outcomes contribute to value.</li>
+                        <li><strong>Banker:</strong> Calculates per-role ROI and steers later budgets using smoothed scores.</li>
+                        <li><strong>Expiring Wallets:</strong> Unspent tokens perish at the end of each round to eliminate hoarding and inflation.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <blockquote>
+                A green build is evidence of progress. It is not, by itself, proof that the software is useful or ready for production.
+            </blockquote>
+
+            <h2>The Architecture: A Treasury Around a Real Workspace</h2>
+            <p>Agora combines role-specific agents, a git workspace, a review gate, pytest, and a budget allocator. LLM calls consume each role's token wallet. Review can veto a patch; QA checks the resulting workspace. The run ends with a verdict and an auditable transcript.</p>
+            <p>The first rounds use an equal split while the system gathers evidence. Later rounds use measured value per token. Coordination roles receive lineage credit for accepted work, so planning does not disappear merely because it does not directly change tests. The global budget remains capped.</p>
+
+            <!-- EDITORIAL VECTOR SVG DIAGRAM 1: ECONOMIC CYCLE -->
+            <div class="diagram-container">
+                <div class="diagram-title">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M8 10h8"/></svg>
+                    AGORA Economic Cycle: Clockwise Value Flow · Counter-Clockwise Token Flow
+                </div>
+                <svg viewBox="0 0 760 380" width="100%" height="100%" style="overflow: visible; font-family: 'Space Grotesk', sans-serif;">
+                    <defs>
+                        <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+                            <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.08"/>
+                        </filter>
+                    </defs>
+
+                    <!-- Background Base -->
+                    <rect x="10" y="10" width="740" height="360" rx="16" fill="#f8fafc" stroke="#e2e8f0" />
+
+                    <!-- Node 1: Goal -->
+                    <g transform="translate(35, 40)" filter="url(#cardShadow)">
+                        <rect width="140" height="65" rx="10" fill="#ffffff" stroke="#1e3a8a" stroke-width="1.5" />
+                        <text x="70" y="28" fill="#1e3a8a" font-size="11" font-weight="700" text-anchor="middle">1. GOAL INGEST</text>
+                        <text x="70" y="48" fill="#334155" font-size="12" font-weight="600" text-anchor="middle">Feature Backlog</text>
+                    </g>
+
+                    <path d="M 175 72 L 225 72" stroke="#1e3a8a" stroke-width="2" />
+
+                    <!-- Node 2: PM & Architect -->
+                    <g transform="translate(225, 40)" filter="url(#cardShadow)">
+                        <rect width="160" height="65" rx="10" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5" />
+                        <text x="80" y="28" fill="#3b82f6" font-size="11" font-weight="700" text-anchor="middle">2. PM &amp; ARCHITECT</text>
+                        <text x="80" y="48" fill="#334155" font-size="12" text-anchor="middle">Decompose &amp; Assign</text>
+                    </g>
+
+                    <path d="M 385 72 L 435 72" stroke="#3b82f6" stroke-width="2" />
+
+                    <!-- Node 3: Coders -->
+                    <g transform="translate(435, 40)" filter="url(#cardShadow)">
+                        <rect width="140" height="65" rx="10" fill="#ffffff" stroke="#047857" stroke-width="1.5" />
+                        <text x="70" y="28" fill="#047857" font-size="11" font-weight="700" text-anchor="middle">3. CODERS (1 &amp; 2)</text>
+                        <text x="70" y="48" fill="#334155" font-size="12" text-anchor="middle">Submit Git Patches</text>
+                    </g>
+
+                    <!-- Downward to Reviewer -->
+                    <path d="M 575 72 L 640 72 L 640 145" stroke="#047857" stroke-width="2" fill="none" />
+
+                    <!-- Node 4: Review Gate -->
+                    <g transform="translate(545, 145)" filter="url(#cardShadow)">
+                        <rect width="190" height="75" rx="10" fill="#fffbeb" stroke="#b45309" stroke-width="2" />
+                        <text x="95" y="26" fill="#b45309" font-size="11" font-weight="800" text-anchor="middle">4. REVIEW GATE</text>
+                        <text x="95" y="45" fill="#92400e" font-size="11" text-anchor="middle">Veto ➔ Git Rollback</text>
+                        <text x="95" y="62" fill="#78350f" font-size="10" text-anchor="middle">Approve ➔ QA Suite</text>
+                    </g>
+
+                    <!-- Leftward to Ground Truth -->
+                    <path d="M 545 182 L 440 182" stroke="#047857" stroke-width="2" fill="none" />
+
+                    <!-- Node 5: Ground Truth Pytest -->
+                    <g transform="translate(195, 145)" filter="url(#cardShadow)">
+                        <rect width="245" height="75" rx="10" fill="#ecfdf5" stroke="#047857" stroke-width="2" />
+                        <text x="122" y="26" fill="#047857" font-size="11" font-weight="800" text-anchor="middle">5. GROUND TRUTH (PYTEST)</text>
+                        <text x="122" y="46" fill="#065f46" font-size="11" text-anchor="middle">Hidden Acceptance Test Suite</text>
+                        <text x="122" y="63" fill="#047857" font-size="10" text-anchor="middle">Parses Real Junit XML Diffs</text>
+                    </g>
+
+                    <!-- Downward to The Banker -->
+                    <path d="M 317 220 L 317 265" stroke="#047857" stroke-width="2" />
+
+                    <!-- Node 6: The Banker -->
+                    <g transform="translate(180, 265)" filter="url(#cardShadow)">
+                        <rect width="275" height="80" rx="12" fill="#fff7ed" stroke="#d97706" stroke-width="2" />
+                        <text x="137" y="26" fill="#d97706" font-size="12" font-weight="800" text-anchor="middle">6. THE BANKER (TREASURY)</text>
+                        <text x="137" y="48" fill="#9a3412" font-size="11" text-anchor="middle">Calculates ROI = Value / Tokens Spent</text>
+                        <text x="137" y="66" fill="#7c2d12" font-size="10" text-anchor="middle">Softmax Allocation for Next Round</text>
+                    </g>
+
+                    <!-- Counter-clockwise currency loop -->
+                    <path d="M 180 305 L 105 305 L 105 105" stroke="#d97706" stroke-width="2.5" stroke-dasharray="4 4" fill="none" />
+                    <text x="80" y="210" fill="#d97706" font-size="10" font-weight="700" transform="rotate(-90, 80, 210)" text-anchor="middle">Token Wallets Reallocated</text>
+                </svg>
+            </div>
+
+            <h2>Four Mechanisms That Make the Budget Inspectable</h2>
+            <p>The allocator matters only if the signals and the resulting spending can be checked.</p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>1. Lineage Coordination Royalty</h4>
+                    <p>Planning roles do not directly write code. Agora credits upstream ticket lineage when work is accepted, including a 20% PM credit configured in the project.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>2. Expiring Wallets &amp; Anti-Hoarding</h4>
+                    <p>Tokens issued in Round <em>N</em> cannot be saved for Round <em>N+1</em>. Unspent tokens expire, and the total amount issued is capped by the run budget.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>3. Write-Protected Acceptance Suites</h4>
+                    <p>Acceptance tests are kept outside the coder workspace. QA runs them against the proposed software, alongside the visible tests, to catch failures that self-reported completion would miss.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>4. Structural Git Rollback on Veto</h4>
+                    <p>A reviewer veto triggers a git rollback of the rejected diff. An integration test checks that the bad diff is removed while an earlier accepted change remains.</p>
+                </div>
+            </div>
+
+            <h2>The Softmax ROI Engine: Where the Next Budget Goes</h2>
+            <p>Think of the treasury as 100 units of inference capacity for the next round. An equal split funds every role the same way. Agora instead scores verified contribution against tokens spent, smooths the scores across rounds, and uses softmax to set the next shares. The chart shows the decision a finance leader would see: <strong>who receives more capacity, and where it comes from.</strong></p>
+
+            <figure class="allocation-chart" aria-labelledby="allocation-title" aria-describedby="allocation-note">
+                <figcaption>
+                    <span class="chart-eyebrow">Treasury allocation / illustrative scenario</span>
+                    <h3 id="allocation-title">A 100-unit budget, reallocated by measured ROI</h3>
+                    <p>Each pair compares an equal split with a possible next-round allocation.</p>
+                </figcaption>
+                <div class="chart-legend"><span><i class="chart-swatch" aria-hidden="true"></i> Fixed share</span><span><i class="chart-swatch dynamic" aria-hidden="true"></i> ROI-guided share</span><span>Values are percent of the same total budget</span></div>
+                <div class="chart-row"><span class="chart-role">PM</span><div class="chart-bars"><span class="chart-bar fixed"></span><span class="chart-bar dynamic" style="width:34.3%"></span></div><span class="chart-values">16.7 → <strong>12%</strong></span></div>
+                <div class="chart-row"><span class="chart-role">Architect</span><div class="chart-bars"><span class="chart-bar fixed"></span><span class="chart-bar dynamic" style="width:34.3%"></span></div><span class="chart-values">16.7 → <strong>12%</strong></span></div>
+                <div class="chart-row"><span class="chart-role">Coder A</span><div class="chart-bars"><span class="chart-bar fixed"></span><span class="chart-bar dynamic" style="width:88.6%"></span></div><span class="chart-values">16.7 → <strong>31%</strong></span></div>
+                <div class="chart-row"><span class="chart-role">Coder B</span><div class="chart-bars"><span class="chart-bar fixed"></span><span class="chart-bar dynamic" style="width:48.6%"></span></div><span class="chart-values">16.7 → <strong>17%</strong></span></div>
+                <div class="chart-row"><span class="chart-role">Reviewer</span><div class="chart-bars"><span class="chart-bar fixed"></span><span class="chart-bar dynamic" style="width:40%"></span></div><span class="chart-values">16.7 → <strong>14%</strong></span></div>
+                <div class="chart-row"><span class="chart-role">QA</span><div class="chart-bars"><span class="chart-bar fixed"></span><span class="chart-bar dynamic" style="width:40%"></span></div><span class="chart-values">16.7 → <strong>14%</strong></span></div>
+                <div class="chart-takeaway"><strong>Finance view:</strong> the total stays at 100 units. Coder A receives 31% after stronger measured contribution; PM and Architect retain funding for coordination.</div>
+                <p class="chart-note" id="allocation-note">Illustrative allocation, not a measured Agora run or a forecast of savings. Fixed shares are rounded from one sixth; bars use a common 0–35% scale.</p>
+            </figure>
+
+            <p>Softmax turns the smoothed scores into shares while avoiding a winner-takes-all decision. This is a budget policy, not a guarantee that the best agent always receives the most tokens: measured value is an imperfect proxy, and coordination roles need explicit credit.</p>
+
+            <h2>What the Runs Actually Show</h2>
+            <p>The project reports 53 passing tests across the runtime. Integration tests cover a shipped HTTP API, reviewer veto and rollback, budget shifts, and budget exhaustion. Two golden tests check repeatable transcripts and replay hashes. These are tests of the system, not 53 independently completed software projects.</p>
+            <p>In the 18-cell deterministic matrix, one tight-budget comparison reached green with 1,483 tokens under dynamic allocation versus 1,760 with the fixed baseline: <strong>15.7% fewer tokens in that comparison</strong>. The matrix uses a scripted FakeLLM, so it cannot establish a general cost saving with real models. Live-provider runs verified token and dollar accounting on a trivial ticket; the documented live HTTP API attempts did not converge within the tested free-tier budgets.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric Dimension</th>
+                        <th>Observed in Agora</th>
+                        <th>Limit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Budget Distribution</strong></td>
+                        <td>Later rounds shift budget toward measured contribution.</td>
+                        <td>Value attribution depends on tests and ticket signals.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Budget Exhaustion</strong></td>
+                        <td>A kill switch halts a run and preserves its artifacts.</td>
+                        <td>It cannot make an underfunded task succeed.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Verification</strong></td>
+                        <td>Pytest and hidden acceptance checks inform the verdict.</td>
+                        <td>Test coverage bounds what can be claimed.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Token Comparison</strong></td>
+                        <td>15.7% fewer tokens in one deterministic tight-budget cell.</td>
+                        <td>No measured general savings claim for live models.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Audit Trail</strong></td>
+                        <td>Ledger, events, messages, LLM usage, pytest results, and replay artifacts.</td>
+                        <td>Artifacts support inspection of the recorded run.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="executive-takeaway">
+                <h3>What I Would Test Next</h3>
+                <p>Agora makes agent spending and software progress inspectable in one runtime. The next useful experiment is a repeated live-model comparison on the same tasks and budgets, with completion rate, tokens, dollars, and regressions reported together. That would show whether the deterministic allocation advantage survives model variance.</p>
+            </div>
+
+            <div class="button-row">
+                <a href="https://github.com/mailtotanvir/agora" class="btn btn-primary" target="_blank" rel="noopener">Explore AGORA on GitHub ↗</a>
+                <a href="/" class="btn btn-secondary">← Back to Tanvir’s Build Log</a>
+            </div>
+        </article>
+
+        <footer>
+            <div>© 2026 Tanvir • AI Systems &amp; Autonomous Governance Architecture</div>
+            <div>
+                <a href="https://github.com/mailtotanvir" target="_blank" rel="noopener">GitHub</a>
+                <span style="margin: 0 10px;">·</span>
+                <a href="https://mailtotanvir.github.io/">Portfolio</a>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>
